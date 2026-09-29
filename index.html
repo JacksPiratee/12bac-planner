@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="Планер студента — расписание пар, задачи и заметки">
+    <meta name="description" content="Планер студента — расписание пар, задачи, ДЗ и объявления группы">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="theme-color" content="#4f46e5">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <title>Планер Студента — 12 Группа</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+        if (localStorage.getItem('student_planner_theme') === 'dark') document.documentElement.classList.add('dark');
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -25,14 +29,22 @@
             margin: 0;
             padding: 0;
         }
+        html.dark input[type="date"] { color-scheme: dark; }
 
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        html.dark ::-webkit-scrollbar-thumb { background: #475569; }
 
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: fadeInUp 0.25s ease-out both; }
 
         @keyframes pulse-ring {
             0% { transform: scale(0.95); opacity: 1; }
@@ -46,7 +58,7 @@
 </head>
 <body class="flex justify-center items-center h-full w-full">
 
-    <div class="w-full max-w-md md:max-w-3xl lg:max-w-5xl bg-gray-50 h-full flex flex-col overflow-hidden shadow-2xl relative">
+    <div class="w-full max-w-md md:max-w-3xl lg:max-w-5xl bg-gray-50 dark:bg-slate-900 h-full flex flex-col overflow-hidden shadow-2xl relative transition-colors">
 
         <header id="main-header" class="bg-indigo-600 text-white pt-10 md:pt-6 pb-5 px-6 rounded-b-3xl shadow-md z-20 shrink-0 transition-all">
             <div class="flex justify-between items-center md:max-w-3xl lg:max-w-5xl mx-auto w-full">
@@ -54,8 +66,14 @@
                     <h1 id="header-title" class="text-2xl font-bold tracking-wide">Моя Учёба</h1>
                     <p id="week-subtitle" class="text-indigo-200 text-xs mt-0.5 font-medium">12 Группа • КФ РГУП</p>
                 </div>
-                <div class="text-right bg-indigo-700/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-indigo-400/30">
-                    <span id="current-time-text" class="text-sm font-bold font-mono tracking-wider">00:00:00</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleTheme()" id="theme-toggle" title="Сменить тему" class="w-9 h-9 rounded-xl bg-indigo-700/60 backdrop-blur-md border border-indigo-400/30 flex items-center justify-center text-indigo-100 hover:bg-indigo-700 transition-all">
+                        <i class="fa-solid fa-moon text-sm"></i>
+                    </button>
+                    <div class="text-right bg-indigo-700/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-indigo-400/30">
+                        <span id="current-time-text" class="text-sm font-bold font-mono tracking-wider block leading-tight">00:00:00</span>
+                        <span id="pair-countdown" class="text-[10px] text-amber-300 font-semibold block leading-tight mt-0.5">—</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -64,27 +82,35 @@
 
             <section id="view-study" class="flex-1 flex flex-col min-h-0 w-full" style="display: flex;">
 
-                <div id="sub-tabs-container" class="shrink-0 flex bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200 z-10 w-full px-2 py-2 transition-all">
+                <div id="sub-tabs-container" class="shrink-0 flex bg-white/95 dark:bg-slate-800/95 backdrop-blur-md shadow-sm border-b border-gray-200 dark:border-slate-700 z-10 w-full px-2 py-2 transition-colors">
                     <div class="flex w-full max-w-xl mx-auto gap-1 overflow-x-auto hide-scroll">
-                        <button onclick="switchStudyTab('schedule')" id="tab-schedule" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-600 transition-colors whitespace-nowrap">Расписание</button>
-                        <button onclick="switchStudyTab('bells')" id="tab-bells" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap">Звонки</button>
-                        <button onclick="switchStudyTab('portal')" id="tab-portal" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap">Фемида</button>
-                        <button onclick="switchStudyTab('library')" id="tab-library" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap">Библиотека</button>
+                        <button onclick="switchStudyTab('schedule')" id="tab-schedule" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 transition-colors whitespace-nowrap">Расписание</button>
+                        <button onclick="switchStudyTab('bells')" id="tab-bells" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Звонки</button>
+                        <button onclick="switchStudyTab('homework')" id="tab-homework" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">ДЗ <span id="homework-badge" class="hidden ml-0.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-px rounded-full align-middle">0</span></button>
+                        <button onclick="switchStudyTab('group')" id="tab-group" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-bullhorn mr-1"></i>Группа</button>
+                        <button onclick="switchStudyTab('subs')" id="tab-subs" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-arrow-right-arrow-left mr-1"></i>Замены</button>
+                        <button onclick="switchStudyTab('grades')" id="tab-grades" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-star mr-1"></i>Оценки</button>
+                        <button onclick="switchStudyTab('session')" id="tab-session" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-fire mr-1"></i>Сессия</button>
+                        <button onclick="switchStudyTab('timer')" id="tab-timer" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-stopwatch mr-1"></i>Таймер</button>
+                        <button onclick="switchStudyTab('portal')" id="tab-portal" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Фемида</button>
+                        <button onclick="switchStudyTab('library')" id="tab-library" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Библиотека</button>
+                        <button onclick="switchStudyTab('consultant')" id="tab-consultant" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Консультант</button>
+                        <button onclick="switchStudyTab('garant')" id="tab-garant" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Гарант</button>
                     </div>
                 </div>
 
                 <div id="scrollable-study-content" class="flex-1 min-h-0 overflow-y-auto w-full flex flex-col">
 
                     <div id="content-schedule" class="flex-col w-full md:max-w-2xl self-center p-4 gap-4" style="display: flex;">
-                        <div class="bg-white p-2 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-between">
-                            <button onclick="changeWeekOffset(-1)" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors">
+                        <div class="bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 flex items-center justify-between transition-colors">
+                            <button onclick="changeWeekOffset(-1)" class="w-8 h-8 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 flex items-center justify-center text-gray-700 dark:text-gray-200 text-xs font-bold transition-colors">
                                 <i class="fa-solid fa-chevron-left"></i>
                             </button>
                             <div class="text-center">
-                                <span id="week-selector-title" class="text-xs font-bold text-gray-800 block">Текущая неделя</span>
-                                <button onclick="resetWeekOffset()" class="text-[10px] text-indigo-600 font-semibold hover:underline">Вернуться к сегодняшней</button>
+                                <span id="week-selector-title" class="text-xs font-bold text-gray-800 dark:text-gray-100 block">Текущая неделя</span>
+                                <button onclick="resetWeekOffset()" class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">Вернуться к сегодняшней</button>
                             </div>
-                            <button onclick="changeWeekOffset(1)" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold transition-colors">
+                            <button onclick="changeWeekOffset(1)" class="w-8 h-8 rounded-xl bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 flex items-center justify-center text-gray-700 dark:text-gray-200 text-xs font-bold transition-colors">
                                 <i class="fa-solid fa-chevron-right"></i>
                             </button>
                         </div>
@@ -103,25 +129,168 @@
                     </div>
 
                     <div id="content-bells" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
-                        <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Расписание звонков</h2>
-                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            <ul class="divide-y divide-gray-100 text-sm" id="bells-list"></ul>
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Расписание звонков</h2>
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden transition-colors">
+                            <ul class="divide-y divide-gray-100 dark:divide-slate-700 text-sm" id="bells-list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Домашних заданий -->
+                    <div id="content-homework" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Домашние задания</h2>
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3.5 flex flex-col gap-2.5 transition-colors animate-in">
+                            <select id="hw-subject" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100"></select>
+                            <input type="text" id="hw-text" placeholder="Что задали?" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                            <div class="flex gap-2">
+                                <input type="date" id="hw-deadline" class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                                <button onclick="addHomework()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 px-4 text-xs transition-all shadow-sm shrink-0">Добавить</button>
+                            </div>
+                        </div>
+                        <ul id="homework-list" class="flex flex-col gap-2.5 pb-2"></ul>
+                    </div>
+
+                    <!-- Вкладка Объявлений группы -->
+                    <div id="content-group" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Объявления группы</h2>
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-3 text-[11px] text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                            <i class="fa-solid fa-circle-info mr-1"></i> Видно всей группе — объявления синхронизируются вместе с задачами. Для публикации у всех должна быть настроена синхронизация («Ещё»).
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3 flex gap-2 transition-colors animate-in">
+                            <input type="text" id="announce-text" placeholder="Написать объявление группе..." class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100 min-w-0">
+                            <button onclick="addAnnouncement()" title="Опубликовать" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-4 text-xs transition-all shadow-sm shrink-0"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                        <ul id="announce-list" class="flex flex-col gap-2.5 pb-2"></ul>
+                    </div>
+
+                    <!-- Вкладка Замены и отмены -->
+                    <div id="content-subs" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Замены и отмены пар</h2>
+                        <div class="bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-900 rounded-2xl p-3 text-[11px] text-violet-900 dark:text-violet-200 leading-relaxed">
+                            <i class="fa-solid fa-circle-info mr-1"></i> Замена действует на всю группу — синхронизируется вместе с остальными данными. Отменённые и доп. пары сразу видны в расписании.
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3.5 flex flex-col gap-2.5 transition-colors animate-in">
+                            <div class="flex gap-2">
+                                <input type="date" id="sub-date" class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100 min-w-0">
+                                <select id="sub-num" class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100 min-w-0">
+                                    <option value="1">1 пара</option><option value="2">2 пара</option><option value="3">3 пара</option><option value="4">4 пара</option><option value="5">5 пара</option><option value="6">6 пара</option><option value="7">7 пара</option>
+                                </select>
+                            </div>
+                            <select id="sub-action" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                                <option value="cancel">❌ Пара отменена</option>
+                                <option value="replace">🔀 Замена (другой предмет)</option>
+                                <option value="extra">➕ Дополнительная пара</option>
+                            </select>
+                            <select id="sub-subject" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100"></select>
+                            <input type="text" id="sub-room" placeholder="Аудитория (необязательно)" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                            <input type="text" id="sub-note" placeholder="Комментарий (необязательно)" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                            <button onclick="addSub()" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl py-2.5 text-xs transition-all shadow-sm">Применить замену</button>
+                        </div>
+                        <ul id="subs-list" class="flex flex-col gap-2.5 pb-2"></ul>
+                    </div>
+
+                    <!-- Вкладка Оценки и пропуски -->
+                    <div id="content-grades" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Оценки и пропуски</h2>
+
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 transition-colors animate-in">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Средний балл</span>
+                            <p id="grades-avg" class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">—</p>
+                            <div id="grades-stats" class="flex flex-col gap-1.5 mt-3"></div>
+                        </div>
+
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-3.5 flex gap-2 transition-colors animate-in">
+                            <select id="grade-subject" class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100 min-w-0"></select>
+                            <select id="grade-value" class="w-20 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                                <option value="5">5</option><option value="4" selected>4</option><option value="3">3</option><option value="2">2</option>
+                            </select>
+                            <button onclick="addGrade()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-4 text-xs transition-all shadow-sm shrink-0">Ок</button>
+                        </div>
+                        <ul id="grades-list" class="flex flex-col gap-2"></ul>
+
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 transition-colors animate-in">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Пропуски</span>
+                                <span id="skips-total" class="text-xs font-extrabold text-red-500">0</span>
+                            </div>
+                            <div id="skips-stats" class="flex flex-col gap-1.5 mt-3"></div>
+                            <p class="text-[10px] text-gray-400 mt-3 leading-relaxed"><i class="fa-solid fa-circle-info mr-1"></i> Отмечайте пропуски тапом по иконке <i class="fa-solid fa-user-xmark text-red-400"></i> в карточке пары в расписании.</p>
+                        </div>
+                        <ul id="skips-list" class="flex flex-col gap-2 pb-2"></ul>
+                    </div>
+
+                    <!-- Вкладка Сессия -->
+                    <div id="content-session" class="flex-col w-full md:max-w-xl self-center p-4 gap-4" style="display: none;">
+
+                        <!-- Мотивационная карточка -->
+                        <div class="rounded-3xl p-6 text-white shadow-lg animate-in" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #db2777 100%);">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                                    <i class="fa-solid fa-fire text-xl"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-extrabold tracking-wide">Экзаменационная сессия</h2>
+                                    <p class="text-[11px] text-white/70 font-medium">Закладка уже готовится к бою</p>
+                                </div>
+                            </div>
+                            <p class="text-sm font-semibold leading-relaxed">Сейчас не время. Но держи планку — учись по максимуму, пока возможность есть.</p>
+                            <p class="text-[12px] text-white/80 leading-relaxed mt-2">Сессия подкрадётся незаметно. Те, кто занимался понемногу каждый день, войдут в неё спокойно — и выйдут победителями.</p>
+                            <div class="flex flex-wrap gap-2 mt-4">
+                                <span class="bg-white/15 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] font-bold"><i class="fa-solid fa-book-open mr-1"></i>Повторяй конспекты</span>
+                                <span class="bg-white/15 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] font-bold"><i class="fa-solid fa-check-double mr-1"></i>Сдавай ДЗ вовремя</span>
+                                <span class="bg-white/15 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] font-bold"><i class="fa-solid fa-moon mr-1"></i>Высыпайся</span>
+                            </div>
+                        </div>
+
+                        <!-- Каркас списка экзаменов -->
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 transition-colors animate-in">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Расписание экзаменов</span>
+                                <span id="session-count" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400">пусто</span>
+                            </div>
+                            <ul id="session-list" class="flex flex-col gap-2 mt-2"></ul>
+                            <p class="text-[10px] text-gray-400 mt-3 leading-relaxed"><i class="fa-solid fa-circle-info mr-1"></i> Когда деканат опубликует даты — они появятся здесь: предмет, день, время и аудитория.</p>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Таймер (Помодоро) -->
+                    <div id="content-timer" class="flex-col w-full md:max-w-xl self-center p-4 gap-4 items-center" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 self-start">Фокус-таймер <span class="normal-case font-semibold text-gray-400">· техника Помодоро</span></h2>
+                        <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 flex flex-col items-center gap-4 w-full transition-colors animate-in">
+                            <span id="timer-phase-label" class="px-3 py-1 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">Фокус · 25 мин</span>
+                            <div class="relative w-52 h-52">
+                                <svg viewBox="0 0 200 200" class="w-full h-full -rotate-90">
+                                    <circle cx="100" cy="100" r="88" fill="none" stroke-width="10" class="stroke-gray-100 dark:stroke-slate-700"/>
+                                    <circle id="timer-ring" cx="100" cy="100" r="88" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" class="text-indigo-600 dark:text-indigo-400" stroke-dasharray="553" stroke-dashoffset="0"/>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span id="timer-time" class="text-5xl font-extrabold font-mono text-gray-800 dark:text-gray-100">25:00</span>
+                                    <span id="timer-cycles" class="text-xs text-gray-400 mt-1 tracking-widest">○○○○</span>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 w-full">
+                                <button id="timer-toggle" onclick="pomodoroToggle()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-3 text-sm transition-all shadow-sm">Старт</button>
+                                <button onclick="pomodoroReset()" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl px-5 text-sm transition-all">Сброс</button>
+                            </div>
+                            <p class="text-[10px] text-gray-400 dark:text-gray-500 text-center leading-relaxed">25 минут работы → 5 минут отдыха. Круг из 4 циклов → длинный перерыв 15 минут.<br>Сегодня циклов: <b id="timer-today" class="text-indigo-600 dark:text-indigo-400">0</b></p>
+                        </div>
+                        <div class="bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 rounded-2xl p-3 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed w-full">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> <b>Как пользоваться:</b> выбери задачу («повторить тему», «сделать ДЗ»), нажми «Старт» и ни на что не отвлекайся до сигнала. Всё личное — только на паузах.
                         </div>
                     </div>
                 </div>
 
                 <!-- Вкладка Портала «Фемида» -->
-                <div id="content-portal" class="flex-1 min-h-0 w-full relative bg-gray-50 flex-col" style="display: none;">
-                    <div class="bg-white p-3 border-b border-gray-200 flex justify-between items-center shrink-0 z-30 shadow-sm">
-                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 text-gray-800 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-2">
+                <div id="content-portal" class="flex-1 min-h-0 w-full relative bg-gray-50 dark:bg-slate-900 flex-col" style="display: none;">
+                    <div class="bg-white dark:bg-slate-800 p-3 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0 z-30 shadow-sm transition-colors">
+                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-600 transition-all flex items-center gap-2">
                             <i class="fa-solid fa-arrow-left"></i> Назад
                         </button>
-                        <span class="text-xs font-bold text-gray-700">Портал «Фемида»</span>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200">Портал «Фемида»</span>
                         <a href="https://femida.raj.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm">
                             Открыть в браузере <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </a>
                     </div>
-                    <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 flex items-center justify-between text-amber-900 shrink-0 z-20">
+                    <div class="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 px-3 py-2 flex items-center justify-between text-amber-900 dark:text-amber-200 shrink-0 z-20">
                         <div class="flex items-center gap-2 text-[11px] leading-tight">
                             <i class="fa-solid fa-triangle-exclamation text-amber-600 shrink-0"></i>
                             <span>Если при входе на смартфоне кидает обратно на логин — нажмите <b>«Открыть в браузере»</b> (браузеры на IPhone блокируют cookie в iframe).</span>
@@ -130,22 +299,22 @@
                     <div class="flex-1 min-h-0 w-full relative">
                         <iframe id="iframe-portal" title="Портал Фемида" class="absolute inset-0 w-full h-full border-0 z-10" allow="forms; scripts; same-origin"></iframe>
                         <!-- Заглушка, если встраивание запрещено -->
-                        <div id="portal-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 flex-col items-center justify-center gap-3 p-8 text-center">
-                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300"></i>
-                            <p class="text-sm font-bold text-gray-700">Портал не открылся внутри приложения</p>
-                            <p class="text-xs text-gray-500 max-w-xs leading-relaxed">Скорее всего, сайт запретил встраивание (заголовок X-Frame-Options) или браузер заблокировал вход. Откройте его в отдельной вкладке.</p>
+                        <div id="portal-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 dark:bg-slate-900 flex-col items-center justify-center gap-3 p-8 text-center">
+                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300 dark:text-slate-600"></i>
+                            <p class="text-sm font-bold text-gray-700 dark:text-gray-200">Портал не открылся внутри приложения</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">Сайт запретил встраивание (заголовок X-Frame-Options) или браузер заблокировал вход. Откройте его в отдельной вкладке.</p>
                             <a id="portal-fallback-link" href="https://femida.raj.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 px-5 text-xs transition-all shadow-sm">Открыть в браузере</a>
                         </div>
                     </div>
                 </div>
 
                 <!-- Вкладка Электронной библиотеки -->
-                <div id="content-library" class="flex-1 min-h-0 w-full relative bg-gray-50 flex-col" style="display: none;">
-                    <div class="bg-white p-3 border-b border-gray-200 flex justify-between items-center shrink-0 z-30 shadow-sm">
-                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 text-gray-800 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-2">
+                <div id="content-library" class="flex-1 min-h-0 w-full relative bg-gray-50 dark:bg-slate-900 flex-col" style="display: none;">
+                    <div class="bg-white dark:bg-slate-800 p-3 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0 z-30 shadow-sm transition-colors">
+                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-600 transition-all flex items-center gap-2">
                             <i class="fa-solid fa-arrow-left"></i> Назад
                         </button>
-                        <span class="text-xs font-bold text-gray-700">Электронная библиотека</span>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200">Электронная библиотека</span>
                         <a href="https://biblioteka.raj.ru/MegaPro/Web/Home/Index" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm">
                             Открыть в браузере <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </a>
@@ -153,11 +322,61 @@
                     <div class="flex-1 min-h-0 w-full relative">
                         <iframe id="iframe-library" title="Электронная библиотека" class="absolute inset-0 w-full h-full border-0 z-10" allow="forms; scripts; same-origin"></iframe>
                         <!-- Заглушка, если встраивание запрещено -->
-                        <div id="library-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 flex-col items-center justify-center gap-3 p-8 text-center">
-                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300"></i>
-                            <p class="text-sm font-bold text-gray-700">Библиотека не открылась внутри приложения</p>
-                            <p class="text-xs text-gray-500 max-w-xs leading-relaxed">Скорее всего, сайт запретил встраивание (заголовок X-Frame-Options). Откройте его в отдельной вкладке.</p>
+                        <div id="library-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 dark:bg-slate-900 flex-col items-center justify-center gap-3 p-8 text-center">
+                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300 dark:text-slate-600"></i>
+                            <p class="text-sm font-bold text-gray-700 dark:text-gray-200">Библиотека не открылась внутри приложения</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">Сайт запретил встраивание (заголовок X-Frame-Options). Откройте его в отдельной вкладке.</p>
                             <a id="library-fallback-link" href="https://biblioteka.raj.ru/MegaPro/Web/Home/Index" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 px-5 text-xs transition-all shadow-sm">Открыть в браузере</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка КонсультантПлюс -->
+                <div id="content-consultant" class="flex-1 min-h-0 w-full relative bg-gray-50 dark:bg-slate-900 flex-col" style="display: none;">
+                    <div class="bg-white dark:bg-slate-800 p-3 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0 z-30 shadow-sm transition-colors">
+                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-600 transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-left"></i> Назад
+                        </button>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200"><i class="fa-solid fa-scale-balanced mr-1 text-indigo-600 dark:text-indigo-400"></i>КонсультантПлюс</span>
+                        <a href="https://www.consultant.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm">
+                            Открыть в браузере <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 px-3 py-2 flex items-center justify-between text-amber-900 dark:text-amber-200 shrink-0 z-20">
+                        <div class="flex items-center gap-2 text-[11px] leading-tight">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600 shrink-0"></i>
+                            <span>Полный доступ — по логину вуза. Сайт часто запрещает встраивание: если не открылось — <b>«Открыть в браузере»</b>.</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 w-full relative">
+                        <iframe id="iframe-consultant" title="КонсультантПлюс" class="absolute inset-0 w-full h-full border-0 z-10" allow="forms; scripts; same-origin"></iframe>
+                        <div id="consultant-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 dark:bg-slate-900 flex-col items-center justify-center gap-3 p-8 text-center">
+                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300 dark:text-slate-600"></i>
+                            <p class="text-sm font-bold text-gray-700 dark:text-gray-200">КонсультантПлюс не открылся внутри приложения</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">Сайт запретил встраивание (заголовок X-Frame-Options) или требует входа по логину вуза. Откройте его в отдельной вкладке.</p>
+                            <a id="consultant-fallback-link" href="https://www.consultant.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 px-5 text-xs transition-all shadow-sm">Открыть в браузере</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка Гарант -->
+                <div id="content-garant" class="flex-1 min-h-0 w-full relative bg-gray-50 dark:bg-slate-900 flex-col" style="display: none;">
+                    <div class="bg-white dark:bg-slate-800 p-3 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0 z-30 shadow-sm transition-colors">
+                        <button onclick="switchStudyTab('schedule')" class="bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-600 transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-left"></i> Назад
+                        </button>
+                        <span class="text-xs font-bold text-gray-700 dark:text-gray-200"><i class="fa-solid fa-book-open mr-1 text-indigo-600 dark:text-indigo-400"></i>Гарант</span>
+                        <a href="https://www.garant.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm">
+                            Открыть в браузере <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    </div>
+                    <div class="flex-1 min-h-0 w-full relative">
+                        <iframe id="iframe-garant" title="Гарант" class="absolute inset-0 w-full h-full border-0 z-10" allow="forms; scripts; same-origin"></iframe>
+                        <div id="garant-fallback" class="hidden absolute inset-0 z-20 bg-gray-50 dark:bg-slate-900 flex-col items-center justify-center gap-3 p-8 text-center">
+                            <i class="fa-solid fa-shield-halved text-4xl text-gray-300 dark:text-slate-600"></i>
+                            <p class="text-sm font-bold text-gray-700 dark:text-gray-200">Гарант не открылся внутри приложения</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xs leading-relaxed">Сайт запретил встраивание (заголовок X-Frame-Options) или требует входа по логину вуза. Откройте его в отдельной вкладке.</p>
+                            <a id="garant-fallback-link" href="https://www.garant.ru" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 px-5 text-xs transition-all shadow-sm">Открыть в браузере</a>
                         </div>
                     </div>
                 </div>
@@ -165,12 +384,12 @@
             </section>
 
             <section id="view-calendar" class="flex-1 min-h-0 overflow-y-auto p-4 w-full flex flex-col md:max-w-xl self-center gap-4" style="display: none;">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 transition-colors animate-in">
                     <div class="flex justify-between items-center mb-3">
-                        <h2 id="calendar-month-title" class="text-sm font-bold text-gray-800">Сентябрь 2026</h2>
+                        <h2 id="calendar-month-title" class="text-sm font-bold text-gray-800 dark:text-gray-100">Сентябрь 2026</h2>
                         <div class="flex gap-1">
-                            <button onclick="changeMonth(-1)" class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-600 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
-                            <button onclick="changeMonth(1)" class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-600 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                            <button onclick="changeMonth(-1)" class="w-7 h-7 rounded-lg bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button onclick="changeMonth(1)" class="w-7 h-7 rounded-lg bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xs"><i class="fa-solid fa-chevron-right"></i></button>
                         </div>
                     </div>
                     <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-gray-400 mb-2">
@@ -179,28 +398,28 @@
                     <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
                 </div>
 
-                <div id="day-study-info-banner" class="bg-indigo-50 border border-indigo-100 p-3.5 rounded-2xl flex items-center gap-3">
+                <div id="day-study-info-banner" class="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 p-3.5 rounded-2xl flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                         <i class="fa-solid fa-clock-rotate-left text-sm"></i>
                     </div>
                     <div>
                         <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Учебная нагрузка</span>
-                        <p id="study-banner-text" class="text-xs font-bold text-indigo-950">Загрузка...</p>
+                        <p id="study-banner-text" class="text-xs font-bold text-indigo-950 dark:text-indigo-100">Загрузка...</p>
                     </div>
                 </div>
 
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 transition-colors animate-in">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Задача на <span id="selected-date-label" class="text-indigo-600 font-bold">выбранный день</span></h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Задача на <span id="selected-date-label" class="text-indigo-600 dark:text-indigo-400 font-bold">выбранный день</span></h3>
                     </div>
                     <div class="flex flex-col gap-2.5">
-                        <input type="text" id="task-text" placeholder="Что нужно сделать?" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                        <input type="text" id="task-text" placeholder="Что нужно сделать?" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
                         <button onclick="addTask()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 text-xs transition-all shadow-sm">Добавить задачу</button>
                     </div>
                 </div>
 
                 <div>
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Задачи на день</h3>
+                    <h3 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Задачи на день</h3>
                     <ul id="task-list" class="flex flex-col gap-2.5 pb-6"></ul>
                 </div>
             </section>
@@ -209,84 +428,88 @@
             <section id="view-settings" class="flex-1 min-h-0 overflow-y-auto p-4 w-full flex flex-col md:max-w-xl self-center gap-4" style="display: none;">
 
                 <!-- Синхронизация -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 transition-colors animate-in">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-gray-800">Синхронизация между устройствами</h2>
-                            <p class="text-[10px] text-gray-400">Задачи и заметки через бесплатный JSONBin.io</p>
+                            <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Синхронизация между устройствами</h2>
+                            <p class="text-[10px] text-gray-400">Задачи, ДЗ и объявления через бесплатный JSONBin.io</p>
                         </div>
                     </div>
-                    <p class="text-[11px] text-gray-500 leading-relaxed">
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
                         1) Зарегистрируйтесь на <b>jsonbin.io</b> (бесплатно, 10 000 запросов/мес).<br>
                         2) Скопируйте <b>X-Access-Key</b> из Dashboard и вставьте ниже.<br>
                         3) Нажмите «Сохранить» — Bin ID создастся автоматически.<br>
                         4) На другом устройстве введите тот же ключ и Bin ID.<br>
                         Ключ хранится только в вашем браузере и никуда не отправляется, кроме jsonbin.io.
                     </p>
-                    <input type="password" id="sync-key" placeholder="X-Access-Key (jsonbin.io)" autocomplete="off" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
-                    <input type="text" id="sync-bin" placeholder="Bin ID (создастся автоматически)" autocomplete="off" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <input type="password" id="sync-key" placeholder="X-Access-Key (jsonbin.io)" autocomplete="off" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                    <input type="text" id="sync-bin" placeholder="Bin ID (создастся автоматически)" autocomplete="off" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
                     <div class="flex gap-2">
                         <button onclick="syncSaveConfig()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 text-xs transition-all shadow-sm">Сохранить</button>
-                        <button onclick="syncPush()" title="Загрузить в облако" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 px-3.5 text-xs transition-all"><i class="fa-solid fa-arrow-up mr-1"></i>В облако</button>
-                        <button onclick="syncPull()" title="Скачать из облака" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 px-3.5 text-xs transition-all"><i class="fa-solid fa-arrow-down mr-1"></i>Из облака</button>
+                        <button onclick="syncPush()" title="Загрузить в облако" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 px-3.5 text-xs transition-all"><i class="fa-solid fa-arrow-up mr-1"></i>В облако</button>
+                        <button onclick="syncPull()" title="Скачать из облака" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 px-3.5 text-xs transition-all"><i class="fa-solid fa-arrow-down mr-1"></i>Из облака</button>
                     </div>
-                    <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                    <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer select-none">
                         <input type="checkbox" id="sync-auto" class="w-4 h-4 accent-indigo-600 cursor-pointer"> Автосинхронизация при изменениях и при запуске
                     </label>
                     <p id="sync-status" class="text-[10px] text-gray-400">Синхронизация не настроена</p>
                 </div>
 
                 <!-- Порталы -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 transition-colors animate-in">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-globe text-sm"></i>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-gray-800">Порталы «Фемида» и библиотека</h2>
+                            <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Порталы «Фемида», библиотека, СПС</h2>
                             <p class="text-[10px] text-gray-400">Резервный вариант, если встраивание запретят</p>
                         </div>
                     </div>
-                    <label class="flex items-start gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                    <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer select-none">
                         <input type="checkbox" id="portals-external" class="w-4 h-4 mt-0.5 accent-indigo-600 cursor-pointer">
                         <span><b>Всегда открывать порталы в браузере</b> — не загружать их внутри приложения (включите, если сайты запретили встраивание).</span>
                     </label>
                     <div class="flex gap-2">
-                        <button onclick="copyPortalLink('portal')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>Ссылка «Фемида»</button>
-                        <button onclick="copyPortalLink('library')" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>Ссылка библиотеки</button>
+                        <button onclick="copyPortalLink('portal')" class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>«Фемида»</button>
+                        <button onclick="copyPortalLink('library')" class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>Библиотека</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="copyPortalLink('consultant')" class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>КонсультантПлюс</button>
+                        <button onclick="copyPortalLink('garant')" class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-copy mr-1"></i>Гарант</button>
                     </div>
                     <p class="text-[10px] text-gray-400">Если iframe не загрузится за 9 секунд, приложение само покажет экран с кнопкой «Открыть в браузере».</p>
                 </div>
 
                 <!-- Резервная копия -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3 pb-6">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 pb-6 transition-colors animate-in">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                             <i class="fa-solid fa-box-archive text-sm"></i>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-gray-800">Резервная копия</h2>
-                            <p class="text-[10px] text-gray-400">Экспорт и импорт всех задач и заметок (JSON)</p>
+                            <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Резервная копия</h2>
+                            <p class="text-[10px] text-gray-400">Экспорт и импорт всех данных (JSON)</p>
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="exportData()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-download mr-1"></i>Экспорт</button>
-                        <label class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2.5 text-xs transition-all text-center cursor-pointer">
+                        <button onclick="exportData()" class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-download mr-1"></i>Экспорт</button>
+                        <label class="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 text-xs transition-all text-center cursor-pointer">
                             <i class="fa-solid fa-upload mr-1"></i>Импорт
                             <input type="file" id="import-file" accept=".json,application/json" class="hidden" onchange="importData(this)">
                         </label>
                     </div>
-                    <button onclick="clearAllData()" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-trash-can mr-1"></i>Удалить все задачи и заметки</button>
+                    <button onclick="clearAllData()" class="w-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 font-bold rounded-xl py-2.5 text-xs transition-all"><i class="fa-solid fa-trash-can mr-1"></i>Удалить все данные на устройстве</button>
                 </div>
             </section>
         </main>
 
-        <nav class="bg-white border-t border-gray-200 pt-2 px-4 flex justify-around md:justify-center md:gap-24 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
+        <nav class="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 pt-2 px-4 flex justify-around md:justify-center md:gap-24 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20 shrink-0 transition-colors" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
             <button onclick="switchView('study')" id="nav-study" class="flex flex-col items-center p-2 text-indigo-600 transition-colors w-20">
-                <div class="bg-indigo-100 p-2 rounded-xl mb-1"><i class="fa-solid fa-graduation-cap text-lg"></i></div>
+                <div class="bg-indigo-100 dark:bg-indigo-950/70 p-2 rounded-xl mb-1"><i class="fa-solid fa-graduation-cap text-lg"></i></div>
                 <span class="text-[11px] font-bold">Учёба</span>
             </button>
             <button onclick="switchView('calendar')" id="nav-calendar" class="flex flex-col items-center p-2 text-gray-400 hover:text-gray-800 transition-colors w-20">
@@ -375,6 +598,12 @@
         // Инициализация локальных хранилищ
         let tasks = JSON.parse(localStorage.getItem('student_planner_tasks')) || [];
         let lessonNotes = JSON.parse(localStorage.getItem('student_planner_lesson_notes')) || {};
+        let homework = JSON.parse(localStorage.getItem('student_planner_homework')) || [];
+        let announcements = JSON.parse(localStorage.getItem('student_planner_announcements')) || [];
+        let sessionExams = JSON.parse(localStorage.getItem('student_planner_session')) || [];
+        let subs = JSON.parse(localStorage.getItem('student_planner_subs')) || [];
+        let skips = JSON.parse(localStorage.getItem('student_planner_skips')) || [];
+        let grades = JSON.parse(localStorage.getItem('student_planner_grades')) || [];
 
         // Настройки синхронизации и приложения
         const syncConfig = JSON.parse(localStorage.getItem('student_planner_sync')) || { key: '', binId: '', auto: false, lastSync: 0 };
@@ -387,15 +616,30 @@
         let weekOffset = 0; 
         let currentStudyTab = 'schedule';
 
-        // URLs внешних порталов (используются и для iframe, и для кнопок-запасных)
+        // URLs внешних порталов
         const portalUrls = {
             portal: 'https://femida.raj.ru',
-            library: 'https://biblioteka.raj.ru/MegaPro/Web/Home/Index'
+            library: 'https://biblioteka.raj.ru/MegaPro/Web/Home/Index',
+            consultant: 'https://www.consultant.ru',
+            garant: 'https://www.garant.ru'
         };
 
+        // Список предметов из расписания (для ДЗ)
+        const subjects = [...new Set(Object.values(scheduleData).flatMap(week => Object.values(week).flatMap(day => day.map(l => l.title))))].sort();
+
         // Состояние iframe-вкладок: idle -> loading -> ok | blocked
-        const iframeState = { portal: 'idle', library: 'idle' };
+        const iframeState = { portal: 'idle', library: 'idle', consultant: 'idle', garant: 'idle' };
         const iframeTimers = {};
+
+        // ---------- Тёмная тема ----------
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('student_planner_theme', isDark ? 'dark' : 'light');
+            document.getElementById('theme-toggle').innerHTML = isDark
+                ? '<i class="fa-solid fa-sun text-sm"></i>'
+                : '<i class="fa-solid fa-moon text-sm"></i>';
+        }
 
         // ---------- Синхронизация (JSONBin.io) ----------
 
@@ -410,7 +654,7 @@
             const res = await fetch('https://api.jsonbin.io/v3/b', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Access-Key': syncConfig.key, 'X-Bin-Name': 'student-planner' },
-                body: JSON.stringify({ tasks, lessonNotes, updatedAt: Date.now() })
+                body: JSON.stringify({ tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, updatedAt: Date.now() })
             });
             if (!res.ok) throw new Error('jsonbin ответил ' + res.status + ' (проверьте ключ)');
             const data = await res.json();
@@ -421,7 +665,7 @@
             const res = await fetch('https://api.jsonbin.io/v3/b/' + syncConfig.binId, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Access-Key': syncConfig.key },
-                body: JSON.stringify({ tasks, lessonNotes, updatedAt: Date.now() })
+                body: JSON.stringify({ tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, updatedAt: Date.now() })
             });
             if (!res.ok) throw new Error('jsonbin ответил ' + res.status);
         }
@@ -467,27 +711,34 @@
             } catch (e) { setSyncStatus('Ошибка: ' + e.message, true); }
         }
 
+        function mergeById(local, cloud) {
+            const map = new Map();
+            local.forEach(x => map.set(x.id, x));
+            cloud.forEach(x => map.set(x.id, x));
+            return [...map.values()];
+        }
+
         async function syncPull() {
             if (!syncConfig.key || !syncConfig.binId) { setSyncStatus('Сначала введите ключ и нажмите «Сохранить»', true); return; }
             setSyncStatus('Загружаю из облака...');
             try {
                 const rec = await cloudPull();
-                const cloudTasks = Array.isArray(rec.tasks) ? rec.tasks : [];
-                // Объединение без дублей: по id задачи; облачная версия побеждает при конфликте
-                const map = new Map();
-                tasks.forEach(t => map.set(t.id, t));
-                cloudTasks.forEach(t => map.set(t.id, t));
-                tasks = [...map.values()];
-                // Заметки: при конфликте побеждает локальная версия
+                tasks = mergeById(tasks, Array.isArray(rec.tasks) ? rec.tasks : []);
+                homework = mergeById(homework, Array.isArray(rec.homework) ? rec.homework : []);
+                sessionExams = mergeById(sessionExams, Array.isArray(rec.sessionExams) ? rec.sessionExams : [])
+                    .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+                subs = mergeById(subs, Array.isArray(rec.subs) ? rec.subs : []);
+                skips = mergeById(skips, Array.isArray(rec.skips) ? rec.skips : []);
+                grades = mergeById(grades, Array.isArray(rec.grades) ? rec.grades : []);
+                announcements = mergeById(announcements, Array.isArray(rec.announcements) ? rec.announcements : [])
+                    .sort((a, b) => b.date - a.date).slice(0, 50);
                 lessonNotes = Object.assign({}, rec.lessonNotes || {}, lessonNotes);
-                saveTasks(); saveNotes();
-                scheduleAutoPush();
-                renderCalendar(); renderFullWeekSchedule();
-                setSyncStatus('Загружено из облака ✓ Задач сейчас: ' + tasks.length);
+                saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades();
+                renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
+                setSyncStatus('Загружено из облака ✓');
             } catch (e) { setSyncStatus('Ошибка: ' + e.message, true); }
         }
 
-        // Автосинхронизация с задержкой 2,5 с после последнего изменения
         let syncTimer = null;
         function scheduleAutoPush() {
             if (!syncConfig.auto || !syncConfig.key || !syncConfig.binId) return;
@@ -500,10 +751,434 @@
             }, 2500);
         }
 
+        // ---------- Домашние задания ----------
+
+        function saveHomework() { localStorage.setItem('student_planner_homework', JSON.stringify(homework)); scheduleAutoPush(); }
+
+        function addHomework() {
+            const subject = document.getElementById('hw-subject').value;
+            const text = document.getElementById('hw-text').value.trim();
+            const deadline = document.getElementById('hw-deadline').value;
+            if (!text) return;
+            homework.unshift({ id: Date.now(), subject, text, deadline, done: false });
+            saveHomework(); renderHomework();
+            document.getElementById('hw-text').value = '';
+        }
+
+        function toggleHomework(id, checkbox) {
+            const h = homework.find(x => x.id === id);
+            if (h) { h.done = checkbox.checked; saveHomework(); renderHomework(); }
+        }
+
+        function deleteHomework(id) {
+            homework = homework.filter(h => h.id !== id);
+            saveHomework(); renderHomework();
+        }
+
+        function hwItemHtml(h) {
+            const d = h.deadline ? parseLocalDate(h.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : 'без даты';
+            return `<li class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 animate-in">
+                <div class="flex items-center gap-3 min-w-0">
+                    <input type="checkbox" ${h.done ? 'checked' : ''} onchange="toggleHomework(${h.id}, this)" class="w-4 h-4 shrink-0 accent-indigo-600 cursor-pointer">
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-gray-800 dark:text-gray-100 ${h.done ? 'line-through text-gray-400 dark:text-gray-500' : ''}">${escapeHtml(h.text)}</p>
+                        <p class="text-[10px] text-gray-400 dark:text-gray-500 truncate"><span class="text-indigo-500 dark:text-indigo-400 font-semibold">${escapeHtml(h.subject)}</span> · сдать ${d}</p>
+                    </div>
+                </div>
+                <button onclick="deleteHomework(${h.id})" class="shrink-0 text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            </li>`;
+        }
+
+        function renderHomework() {
+            const sel = document.getElementById('hw-subject');
+            if (sel && sel.options.length === 0) {
+                sel.innerHTML = '<option value="">— выберите предмет —</option>' +
+                    subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+            }
+            const list = document.getElementById('homework-list');
+            const badge = document.getElementById('homework-badge');
+            const active = homework.filter(h => !h.done).length;
+            if (badge) { badge.innerText = active; badge.classList.toggle('hidden', active === 0); }
+
+            if (homework.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-6 italic">Пока домашних заданий нет 🎉</p>`;
+                return;
+            }
+            const today = formatDateISO(new Date());
+            const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+            const tomorrow = formatDateISO(tmr);
+
+            const groups = [
+                { title: '⚠️ Просрочено', items: homework.filter(h => !h.done && h.deadline && h.deadline < today), color: 'text-red-500' },
+                { title: '📅 Сегодня', items: homework.filter(h => !h.done && h.deadline === today), color: 'text-amber-600 dark:text-amber-400' },
+                { title: '🌅 Завтра', items: homework.filter(h => !h.done && h.deadline === tomorrow), color: 'text-indigo-500 dark:text-indigo-400' },
+                { title: '📆 Позже', items: homework.filter(h => !h.done && (!h.deadline || h.deadline > tomorrow)), color: 'text-gray-400 dark:text-gray-500' },
+                { title: '✅ Выполнено', items: homework.filter(h => h.done), color: 'text-emerald-600 dark:text-emerald-400' }
+            ];
+            let html = '';
+            groups.forEach(g => {
+                if (!g.items.length) return;
+                html += `<h3 class="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5 ${g.color}">${g.title} (${g.items.length})</h3>`;
+                g.items.forEach(h => { html += hwItemHtml(h); });
+            });
+            list.innerHTML = html;
+        }
+
+        // ---------- Объявления группы ----------
+
+        function saveAnnouncements() { localStorage.setItem('student_planner_announcements', JSON.stringify(announcements)); scheduleAutoPush(); }
+        function saveSession() { localStorage.setItem('student_planner_session', JSON.stringify(sessionExams)); scheduleAutoPush(); }
+        function saveSubs() { localStorage.setItem('student_planner_subs', JSON.stringify(subs)); scheduleAutoPush(); }
+        function saveSkips() { localStorage.setItem('student_planner_skips', JSON.stringify(skips)); scheduleAutoPush(); }
+        function saveGrades() { localStorage.setItem('student_planner_grades', JSON.stringify(grades)); scheduleAutoPush(); }
+
+        function addAnnouncement() {
+            const input = document.getElementById('announce-text');
+            const text = input.value.trim();
+            if (!text) return;
+            announcements.unshift({ id: Date.now(), text, date: Date.now() });
+            announcements = announcements.slice(0, 50);
+            saveAnnouncements(); renderAnnouncements();
+            input.value = '';
+        }
+
+        function deleteAnnouncement(id) {
+            announcements = announcements.filter(a => a.id !== id);
+            saveAnnouncements(); renderAnnouncements();
+        }
+
+        function renderAnnouncements() {
+            const list = document.getElementById('announce-list');
+            if (announcements.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-6 italic">Объявлений пока нет</p>`;
+                return;
+            }
+            list.innerHTML = announcements.map(a => `
+                <li class="bg-white dark:bg-slate-800 p-3.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm animate-in">
+                    <p class="text-xs font-medium text-gray-800 dark:text-gray-100 leading-relaxed break-words">${escapeHtml(a.text)}</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500">${new Date(a.date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        <button onclick="deleteAnnouncement(${a.id})" class="text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                    </div>
+                </li>`).join('');
+        }
+
+        // ---------- Замены и отмены ----------
+
+        function subBadgeHtml(sub) {
+            if (sub.action === 'cancel') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-900">ОТМЕНЕНА</span>';
+            if (sub.action === 'replace') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-900">ЗАМЕНА</span>';
+            return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-900">ДОП. ПАРА</span>';
+        }
+
+        function subActionLabel(a) {
+            return a === 'cancel' ? '❌ Отменена' : a === 'replace' ? '🔀 Замена' : '➕ Доп. пара';
+        }
+
+        function fillSubjectSelect(id) {
+            const sel = document.getElementById(id);
+            if (sel && sel.options.length === 0) {
+                sel.innerHTML = '<option value="">— выберите предмет —</option>' +
+                    subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+            }
+        }
+
+        function addSub() {
+            const date = document.getElementById('sub-date').value;
+            const num = parseInt(document.getElementById('sub-num').value);
+            const action = document.getElementById('sub-action').value;
+            const title = document.getElementById('sub-subject').value;
+            const room = document.getElementById('sub-room').value.trim();
+            const note = document.getElementById('sub-note').value.trim();
+            if (!date) { alert('Укажите дату'); return; }
+            if (action !== 'cancel' && !title) { alert('Выберите предмет'); return; }
+            subs = subs.filter(s => !(s.date === date && s.num === num));
+            subs.push({ id: Date.now(), date, num, action, title, room, note });
+            saveSubs(); renderSubs(); renderFullWeekSchedule();
+            document.getElementById('sub-room').value = '';
+            document.getElementById('sub-note').value = '';
+        }
+
+        function deleteSub(id) {
+            subs = subs.filter(s => s.id !== id);
+            saveSubs(); renderSubs(); renderFullWeekSchedule();
+        }
+
+        function renderSubs() {
+            fillSubjectSelect('sub-subject');
+            const list = document.getElementById('subs-list');
+            if (subs.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-6 italic">Замен нет — расписание по плану</p>`;
+                return;
+            }
+            const sorted = [...subs].sort((a, b) => a.date.localeCompare(b.date) || a.num - b.num);
+            list.innerHTML = sorted.map(s => `
+                <li class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 animate-in">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-100">${parseLocalDate(s.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', weekday: 'short' })} · ${s.num} пара · ${subActionLabel(s.action)}</p>
+                        ${s.title ? `<p class="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">→ ${escapeHtml(s.title)}${s.room ? ' · ауд. ' + escapeHtml(s.room) : ''}</p>` : ''}
+                        ${s.note ? `<p class="text-[11px] text-violet-600 dark:text-violet-400 truncate mt-0.5">${escapeHtml(s.note)}</p>` : ''}
+                    </div>
+                    <button onclick="deleteSub(${s.id})" class="shrink-0 text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                </li>`).join('');
+        }
+
+        // ---------- Пропуски ----------
+
+        function toggleSkip(dateISO, num, wt, dn) {
+            const key = dateISO + '_' + num;
+            const idx = skips.findIndex(s => s.key === key);
+            if (idx >= 0) {
+                skips.splice(idx, 1);
+            } else {
+                let subject = 'Доп. пара';
+                const lessons = (scheduleData[wt] && scheduleData[wt][dn]) || [];
+                const l = lessons.find(x => x.num === num);
+                if (l) subject = l.title;
+                else {
+                    const sub = subs.find(s => s.date === dateISO && s.num === num);
+                    if (sub && sub.title) subject = sub.title;
+                }
+                skips.push({ id: Date.now(), key, subject, dateISO, num });
+            }
+            saveSkips(); renderFullWeekSchedule(); renderGrades();
+        }
+
+        function deleteSkip(id) {
+            skips = skips.filter(s => s.id !== id);
+            saveSkips(); renderFullWeekSchedule(); renderGrades();
+        }
+
+        function renderSkips() {
+            const totalEl = document.getElementById('skips-total');
+            const statsEl = document.getElementById('skips-stats');
+            const listEl = document.getElementById('skips-list');
+            totalEl.innerText = skips.length;
+            if (skips.length === 0) {
+                statsEl.innerHTML = `<p class="text-[11px] text-gray-400 dark:text-gray-500 italic">Пропусков нет 👍</p>`;
+                listEl.innerHTML = '';
+                return;
+            }
+            const bySubject = {};
+            skips.forEach(s => { bySubject[s.subject] = (bySubject[s.subject] || 0) + 1; });
+            statsEl.innerHTML = Object.entries(bySubject).sort((a, b) => b[1] - a[1]).map(([subj, cnt]) => `
+                <div class="flex justify-between items-center text-[11px]">
+                    <span class="text-gray-600 dark:text-gray-300 truncate pr-2">${escapeHtml(subj)}</span>
+                    <span class="font-bold text-red-500 shrink-0">${cnt}</span>
+                </div>`).join('');
+            const recent = [...skips].sort((a, b) => b.id - a.id).slice(0, 10);
+            listEl.innerHTML = `<h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Последние пропуски</h3>` + recent.map(s => `
+                <li class="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 animate-in">
+                    <p class="text-[11px] text-gray-600 dark:text-gray-300 truncate">${parseLocalDate(s.dateISO).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} · ${s.num} пара · <span class="font-semibold">${escapeHtml(s.subject)}</span></p>
+                    <button onclick="deleteSkip(${s.id})" class="shrink-0 text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                </li>`).join('');
+        }
+
+        // ---------- Оценки ----------
+
+        function addGrade() {
+            const subject = document.getElementById('grade-subject').value;
+            const value = parseInt(document.getElementById('grade-value').value);
+            if (!subject) { alert('Выберите предмет'); return; }
+            grades.push({ id: Date.now(), subject, value, dateISO: formatDateISO(new Date()) });
+            saveGrades(); renderGrades();
+        }
+
+        function deleteGrade(id) {
+            grades = grades.filter(g => g.id !== id);
+            saveGrades(); renderGrades();
+        }
+
+        function renderGrades() {
+            fillSubjectSelect('grade-subject');
+            renderSkips();
+            const avgEl = document.getElementById('grades-avg');
+            const statsEl = document.getElementById('grades-stats');
+            const listEl = document.getElementById('grades-list');
+            const numeric = grades.filter(g => typeof g.value === 'number');
+            if (numeric.length === 0) {
+                avgEl.innerText = '—';
+                statsEl.innerHTML = `<p class="text-[11px] text-gray-400 dark:text-gray-500 italic">Оценок пока нет</p>`;
+                listEl.innerHTML = '';
+                return;
+            }
+            const avg = numeric.reduce((s, g) => s + g.value, 0) / numeric.length;
+            avgEl.innerText = avg.toFixed(2);
+            const bySubject = {};
+            numeric.forEach(g => {
+                if (!bySubject[g.subject]) bySubject[g.subject] = { sum: 0, cnt: 0 };
+                bySubject[g.subject].sum += g.value;
+                bySubject[g.subject].cnt += 1;
+            });
+            statsEl.innerHTML = Object.entries(bySubject).sort((a, b) => a[0].localeCompare(b[0])).map(([subj, st]) => `
+                <div class="flex justify-between items-center text-[11px]">
+                    <span class="text-gray-600 dark:text-gray-300 truncate pr-2">${escapeHtml(subj)} <span class="text-gray-400">(${st.cnt})</span></span>
+                    <span class="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">${(st.sum / st.cnt).toFixed(1)}</span>
+                </div>`).join('');
+            const gradeColor = v => v >= 5 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' : v === 4 ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300' : v === 3 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400';
+            const sorted = [...grades].sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.id - a.id).slice(0, 30);
+            listEl.innerHTML = `<h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">История оценок</h3>` + sorted.map(g => `
+                <li class="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 animate-in">
+                    <div class="min-w-0 flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0 ${gradeColor(g.value)}">${g.value}</span>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-300 truncate">${escapeHtml(g.subject)} <span class="text-gray-400">${parseLocalDate(g.dateISO).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span></p>
+                    </div>
+                    <button onclick="deleteGrade(${g.id})" class="shrink-0 text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                </li>`).join('');
+        }
+
+        // ---------- Сессия (экзамены) ----------
+
+        /* Заготовка: когда деканат опубликует расписание, экзамены будут лежать
+           в sessionExams = [{ id, subject, dateISO, time, room, note }] —
+           хранилище и синхронизация уже готовы, останется только заполнить. */
+        function renderSession() {
+            const listEl = document.getElementById('session-list');
+            const countEl = document.getElementById('session-count');
+            if (!listEl) return;
+            if (!sessionExams || sessionExams.length === 0) {
+                countEl.innerText = 'пусто';
+                countEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400';
+                listEl.innerHTML = `
+                    <li class="border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-4 text-center">
+                        <i class="fa-solid fa-calendar-xmark text-2xl text-gray-300 dark:text-slate-600 mb-2"></i>
+                        <p class="text-xs font-bold text-gray-500 dark:text-gray-400">Дат экзаменов пока нет</p>
+                        <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Загляни сюда ближе к сессии</p>
+                    </li>`;
+                return;
+            }
+            countEl.innerText = sessionExams.length;
+            countEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400';
+            listEl.innerHTML = sessionExams.map(e => `
+                <li class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-rose-100 dark:border-rose-950/60 shadow-sm flex items-center justify-between gap-3 animate-in">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-100">${escapeHtml(e.subject)}</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">${parseLocalDate(e.dateISO).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short' })}${e.time ? ' · ' + escapeHtml(e.time) : ''}${e.room ? ' · ауд. ' + escapeHtml(e.room) : ''}</p>
+                        ${e.note ? `<p class="text-[10px] text-violet-600 dark:text-violet-400 mt-0.5">${escapeHtml(e.note)}</p>` : ''}
+                    </div>
+                    <span class="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pen"></i></span>
+                </li>`).join('');
+        }
+
+        // ---------- Помодоро-таймер ----------
+
+        const POMO_DUR = { focus: 25 * 60 * 1000, short: 5 * 60 * 1000, long: 15 * 60 * 1000 };
+        const POMO_RING_LEN = 553; // 2 * pi * 88
+
+        let pomo = {
+            phase: 'focus',      // focus | short | long
+            running: false,
+            remaining: POMO_DUR.focus,
+            cyclesDone: 0,       // завершённых фокусов в текущем круге
+            endAt: null,
+            timerId: null
+        };
+
+        function pomoToday() {
+            const today = formatDateISO(new Date());
+            const d = JSON.parse(localStorage.getItem('student_planner_pomo')) || {};
+            return (d.date === today) ? d : { date: today, count: 0 };
+        }
+
+        function pomoBeep(times) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                for (let i = 0; i < times; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.frequency.value = 880;
+                    const t = ctx.currentTime + i * 0.35;
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                    osc.start(t); osc.stop(t + 0.3);
+                }
+            } catch (e) {}
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        }
+
+        function pomoRender() {
+            const total = POMO_DUR[pomo.phase];
+            const ms = pomo.running ? Math.max(0, pomo.endAt - Date.now()) : pomo.remaining;
+            const s = Math.max(0, Math.ceil(ms / 1000));
+            document.getElementById('timer-time').innerText =
+                String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+            document.getElementById('timer-ring').style.strokeDashoffset =
+                String(POMO_RING_LEN * (1 - ms / total));
+            const label = document.getElementById('timer-phase-label');
+            if (pomo.phase === 'focus') {
+                label.innerText = 'Фокус · 25 мин';
+                label.className = "px-3 py-1 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300";
+            } else if (pomo.phase === 'short') {
+                label.innerText = 'Перерыв · 5 мин';
+                label.className = "px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300";
+            } else {
+                label.innerText = 'Длинный перерыв · 15 мин';
+                label.className = "px-3 py-1 rounded-full text-[10px] font-bold bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300";
+            }
+            const filled = pomo.cyclesDone % 4;
+            document.getElementById('timer-cycles').innerText = '●'.repeat(filled) + '○'.repeat(4 - filled);
+            document.getElementById('timer-toggle').innerText = pomo.running ? 'Пауза' : 'Старт';
+            document.getElementById('timer-today').innerText = pomoToday().count;
+        }
+
+        function pomoTick() {
+            if (pomo.endAt - Date.now() <= 0) {
+                pomoFinishPhase();
+            }
+            pomoRender();
+        }
+
+        function pomoFinishPhase() {
+            clearInterval(pomo.timerId);
+            pomo.running = false;
+            if (pomo.phase === 'focus') {
+                pomo.cyclesDone++;
+                const st = pomoToday(); st.count++;
+                localStorage.setItem('student_planner_pomo', JSON.stringify(st));
+                pomoBeep(3);
+                pomo.phase = (pomo.cyclesDone % 4 === 0) ? 'long' : 'short';
+                pomo.remaining = POMO_DUR[pomo.phase];
+                pomoStart(); // перерыв стартует сам
+            } else {
+                pomoBeep(2);
+                pomo.phase = 'focus';
+                pomo.remaining = POMO_DUR.focus;
+                // новый фокус ждёт нажатия «Старт»
+            }
+        }
+
+        function pomoStart() {
+            pomo.running = true;
+            pomo.endAt = Date.now() + pomo.remaining;
+            clearInterval(pomo.timerId);
+            pomo.timerId = setInterval(pomoTick, 250);
+            pomoRender();
+        }
+
+        function pomoPause() {
+            pomo.remaining = Math.max(0, pomo.endAt - Date.now());
+            pomo.running = false;
+            clearInterval(pomo.timerId);
+            pomoRender();
+        }
+
+        function pomodoroToggle() {
+            if (pomo.running) { pomoPause(); } else { pomoStart(); }
+        }
+
+        function pomodoroReset() {
+            clearInterval(pomo.timerId);
+            pomo.running = false;
+            pomo.phase = 'focus';
+            pomo.remaining = POMO_DUR.focus;
+            pomoRender();
+        }
+
         // ---------- Резервная копия ----------
 
         function exportData() {
-            const blob = new Blob([JSON.stringify({ tasks, lessonNotes }, null, 2)], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify({ tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades }, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = 'planner-backup-' + formatDateISO(new Date()) + '.json';
@@ -520,20 +1195,26 @@
                 try {
                     const d = JSON.parse(reader.result);
                     if (Array.isArray(d.tasks)) tasks = d.tasks;
+                    if (Array.isArray(d.homework)) homework = d.homework;
+                    if (Array.isArray(d.announcements)) announcements = d.announcements;
+                    if (Array.isArray(d.sessionExams)) sessionExams = d.sessionExams;
+                    if (Array.isArray(d.subs)) subs = d.subs;
+                    if (Array.isArray(d.skips)) skips = d.skips;
+                    if (Array.isArray(d.grades)) grades = d.grades;
                     if (d.lessonNotes && typeof d.lessonNotes === 'object') lessonNotes = d.lessonNotes;
-                    saveTasks(); saveNotes(); scheduleAutoPush();
-                    renderCalendar(); renderFullWeekSchedule();
-                    alert('Импортировано: ' + tasks.length + ' задач');
+                    saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSubs(); saveSkips(); saveGrades();
+                    renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSubs(); renderGrades();
+                    alert('Импортировано ✓');
                 } catch (e) { alert('Не удалось прочитать файл: ' + e.message); }
             };
             reader.readAsText(file);
         }
 
         function clearAllData() {
-            if (!confirm('Удалить ВСЕ задачи и заметки на этом устройстве? (в облаке останутся)')) return;
-            tasks = []; lessonNotes = {};
-            saveTasks(); saveNotes(); scheduleAutoPush();
-            renderCalendar(); renderFullWeekSchedule();
+            if (!confirm('Удалить ВСЕ задачи, ДЗ, заметки и объявления на этом устройстве? (в облаке останутся)')) return;
+            tasks = []; homework = []; announcements = []; sessionExams = []; subs = []; skips = []; grades = []; lessonNotes = {};
+            saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades();
+            renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
         }
 
         function copyPortalLink(tab) {
@@ -559,7 +1240,6 @@
             fb.classList.remove('flex');
         }
 
-        // Следим за загрузкой iframe: если за 9 секунд не загрузился — показываем заглушку
         function armIframeFallback(tab) {
             if (iframeState[tab] === 'blocked') { showFallback(tab); return; }
             if (iframeState[tab] === 'ok') { hideFallback(tab); return; }
@@ -598,16 +1278,13 @@
 
         // Функции для активации и сохранения заметки к паре
         function editLessonNote(key) {
-            // Скрываем блок просмотра
             document.getElementById(`note-view-${key}`).classList.add('hidden');
             document.getElementById(`note-view-${key}`).classList.remove('flex');
 
-            // Показываем поле ввода
             const editDiv = document.getElementById(`note-edit-${key}`);
             editDiv.classList.remove('hidden');
             editDiv.classList.add('flex');
 
-            // Фокусируемся на вводе и ставим курсор в конец
             const input = document.getElementById(`note-input-${key}`);
             input.focus();
             const val = input.value;
@@ -623,28 +1300,26 @@
             if (val) {
                 lessonNotes[key] = val;
             } else {
-                delete lessonNotes[key]; // Если стерли текст, удаляем заметку
+                delete lessonNotes[key];
             }
-            saveNotes(); // Сохраняем в localStorage
+            saveNotes();
 
-            // Обновляем визуальный блок
             const viewDiv = document.getElementById(`note-view-${key}`);
             const textSpan = document.getElementById(`note-text-${key}`);
             const icon = viewDiv.querySelector('i');
 
             if (val) {
                 textSpan.innerText = val;
-                textSpan.className = "text-xs text-amber-900 font-medium flex-1 break-words";
-                viewDiv.className = "flex items-start gap-2 cursor-pointer transition-all bg-amber-50/60 border border-amber-200/50 p-2 rounded-lg hover:bg-amber-100/50";
+                textSpan.className = "text-xs text-amber-900 dark:text-amber-200 font-medium flex-1 break-words";
+                viewDiv.className = "flex items-start gap-2 cursor-pointer transition-all bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/60 p-2 rounded-lg hover:bg-amber-100/50 dark:hover:bg-amber-900/30";
                 icon.className = "fa-solid fa-thumbtack text-amber-500 mt-0.5 text-[10px] shrink-0";
             } else {
                 textSpan.innerText = "Добавить заметку / ДЗ...";
-                textSpan.className = "text-xs text-gray-500 flex-1 break-words";
+                textSpan.className = "text-xs text-gray-500 dark:text-gray-400 flex-1 break-words";
                 viewDiv.className = "flex items-start gap-2 cursor-pointer transition-all p-1 opacity-50 hover:opacity-100";
                 icon.className = "fa-solid fa-pen text-gray-400 mt-0.5 text-[10px] shrink-0";
             }
 
-            // Прячем поле ввода и показываем блок просмотра
             document.getElementById(`note-edit-${key}`).classList.add('hidden');
             document.getElementById(`note-edit-${key}`).classList.remove('flex');
 
@@ -702,8 +1377,8 @@
 
                 let btnClass = "h-8 w-8 mx-auto rounded-xl flex flex-col items-center justify-center text-xs font-semibold relative transition-all ";
                 if (isSelected) btnClass += "bg-indigo-600 text-white shadow-md shadow-indigo-200";
-                else if (isToday) btnClass += "border-2 border-indigo-600 text-indigo-600 bg-indigo-50/50";
-                else btnClass += "text-gray-700 hover:bg-gray-100";
+                else if (isToday) btnClass += "border-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/40";
+                else btnClass += "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700";
 
                 grid.innerHTML += `
                     <div onclick="selectCalendarDate('${dStr}')" class="cursor-pointer py-1">
@@ -747,19 +1422,19 @@
             const dayTasks = tasks.filter(t => t.date === selectedDateStr);
 
             if (dayTasks.length === 0) {
-                list.innerHTML = `<p class="text-xs text-gray-400 text-center py-4 italic">На эту дату задач нет</p>`; return;
+                list.innerHTML = `<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-4 italic">На эту дату задач нет</p>`; return;
             }
             dayTasks.forEach(task => {
                 const li = document.createElement('li');
-                li.className = "bg-white p-3.5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between";
+                li.className = "bg-white dark:bg-slate-800 p-3.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between animate-in";
                 li.innerHTML = `
                     <div class="flex items-center gap-3 w-full pr-2">
                         <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTaskDone(${task.id}, this)" class="w-4 h-4 shrink-0 text-indigo-600 rounded border-gray-300 accent-indigo-600 cursor-pointer">
                         <div class="break-words w-full">
-                            <p class="text-xs font-semibold text-gray-800 ${task.done ? 'line-through text-gray-400' : ''}">${escapeHtml(task.text)}</p>
+                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-100 ${task.done ? 'line-through text-gray-400 dark:text-gray-500' : ''}">${escapeHtml(task.text)}</p>
                         </div>
                     </div>
-                    <button onclick="deleteTask(${task.id})" class="shrink-0 text-gray-300 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                    <button onclick="deleteTask(${task.id})" class="shrink-0 text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
                 `;
                 list.appendChild(li);
             });
@@ -783,8 +1458,19 @@
             const today = new Date();
             document.getElementById('today-date-text').innerText = today.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
 
-            // Слушатели загрузки iframe (успех = событие load)
-            ['portal', 'library'].forEach(tab => {
+            // Иконка темы
+            const isDark = document.documentElement.classList.contains('dark');
+            document.getElementById('theme-toggle').innerHTML = isDark
+                ? '<i class="fa-solid fa-sun text-sm"></i>'
+                : '<i class="fa-solid fa-moon text-sm"></i>';
+
+            // Дедлайн ДЗ по умолчанию — завтра
+            const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+            document.getElementById('hw-deadline').value = formatDateISO(tmr);
+            document.getElementById('sub-date').value = formatDateISO(new Date());
+
+            // Слушатели load для iframe
+            ['portal', 'library', 'consultant', 'garant'].forEach(tab => {
                 const ifr = document.getElementById('iframe-' + tab);
                 ifr.addEventListener('load', () => {
                     clearTimeout(iframeTimers[tab]);
@@ -792,13 +1478,12 @@
                 });
             });
 
-            // Настройки синхронизации -> поля
+            // Настройки -> поля
             document.getElementById('sync-key').value = syncConfig.key || '';
             document.getElementById('sync-bin').value = syncConfig.binId || '';
             document.getElementById('sync-auto').checked = !!syncConfig.auto;
             if (syncConfig.lastSync) setSyncStatus('Последняя синхронизация: ' + new Date(syncConfig.lastSync).toLocaleString('ru-RU'));
 
-            // Настройки порталов -> чекбокс
             const pe = document.getElementById('portals-external');
             pe.checked = !!appSettings.portalsExternal;
             pe.addEventListener('change', () => {
@@ -809,11 +1494,16 @@
             renderFullWeekSchedule();
             renderBells();
             renderCalendar();
+            renderHomework();
+            renderAnnouncements();
+            renderSubs();
+            renderGrades();
+            renderSession();
+            pomoRender();
 
             setInterval(updateClockAndLiveStatus, 1000);
             updateClockAndLiveStatus();
 
-            // При включённой автосинхронизации подтягиваем данные из облака при старте
             if (syncConfig.auto && syncConfig.key && syncConfig.binId) {
                 syncPull();
             }
@@ -853,59 +1543,77 @@
                 const isRealToday = (thisDayISO === realTodayStr);
 
                 const dayCardClass = isRealToday 
-                    ? "bg-amber-50/40 rounded-2xl shadow-md border-2 border-amber-400 overflow-hidden" 
-                    : "bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden";
+                    ? "bg-amber-50/40 dark:bg-amber-950/20 rounded-2xl shadow-md border-2 border-amber-400 overflow-hidden animate-in" 
+                    : "bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden animate-in transition-colors";
 
                 const dayHeaderClass = isRealToday
                     ? "bg-amber-400 text-slate-900 px-4 py-2.5 flex justify-between items-center"
-                    : "bg-gray-100/80 text-gray-700 px-4 py-2 flex justify-between items-center border-b border-gray-100";
+                    : "bg-gray-100/80 dark:bg-slate-700/50 text-gray-700 dark:text-gray-200 px-4 py-2 flex justify-between items-center border-b border-gray-100 dark:border-slate-700";
 
                 let lessonsHtml = '';
-                if (dayLessons.length === 0) {
-                    lessonsHtml = `<p class="text-xs text-gray-400 text-center py-4 italic">В этот день занятий нет</p>`;
+                let renderList = [];
+                if (dayLessons.length === 0 && !(subs || []).some(s => s.date === thisDayISO && s.action === 'extra')) {
+                    lessonsHtml = `<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-4 italic">В этот день занятий нет</p>`;
                 } else {
-                    dayLessons.forEach(item => {
+                    const daySubs = subs.filter(s => s.date === thisDayISO);
+                    renderList = dayLessons.map(item => {
+                        const sub = daySubs.find(s => s.num === item.num && s.action !== 'extra');
+                        if (!sub) return Object.assign({}, item, { sub: null });
+                        if (sub.action === 'cancel') return Object.assign({}, item, { sub });
+                        return { num: item.num, title: sub.title || item.title, teacher: item.teacher, room: sub.room || item.room, type: item.type, sub };
+                    });
+                    daySubs.filter(s => s.action === 'extra').forEach(s => {
+                        renderList.push({ num: s.num, title: s.title, teacher: '—', room: s.room || '—', type: s.note || 'Доп.', sub: s, isExtra: true });
+                    });
+                    renderList.sort((a, b) => a.num - b.num);
+                    renderList.forEach(item => {
                         const bell = bells.find(b => b.num === item.num);
+                        const skipKey = `${thisDayISO}_${item.num}`;
+                        const isSkipped = skips.some(s => s.key === skipKey);
+                        const skipBtnClass = isSkipped
+                            ? 'bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400';
                         const isLecture = item.type === "Лекция";
-                        const badgeColor = isLecture ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700';
+                        const badgeColor = isLecture
+                            ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300'
+                            : 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300';
 
-                        // Формируем уникальный ключ для заметки
                         const noteKey = `${thisDayISO}_${item.num}`;
                         const savedNote = lessonNotes[noteKey] ? escapeHtml(lessonNotes[noteKey]) : '';
 
                         lessonsHtml += `
-                            <div id="card-day-${dayNum}-lesson-${item.num}" class="lesson-card p-3.5 border-b border-gray-100 last:border-b-0 transition-all">
+                            <div id="card-day-${dayNum}-lesson-${item.num}" class="lesson-card p-3.5 border-b border-gray-100 dark:border-slate-700/70 last:border-b-0 transition-all ${isSkipped ? 'border-l-4 border-l-red-400 dark:border-l-red-800 bg-red-50/40 dark:bg-red-950/20' : ''}">
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <div class="flex items-center gap-2">
-                                            <span class="text-[11px] font-bold text-indigo-600">${item.num} Пара (${bell.start} – ${bell.end})</span>
-                                            <span class="badge-live hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 items-center gap-1 live-badge-ring">
+                                            <span class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">${item.num} Пара (${bell.start} – ${bell.end})</span>
+                                            ${item.sub ? subBadgeHtml(item.sub) : ''}
+                                            <span class="badge-live hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 items-center gap-1 live-badge-ring">
                                                 <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping"></span> Пара идёт
                                             </span>
                                         </div>
-                                        <h4 class="font-bold text-gray-800 text-sm mt-1 leading-snug">${item.title}</h4>
-                                        <p class="text-[11px] text-gray-500 mt-1"><i class="fa-solid fa-user-tie mr-1"></i> ${item.teacher}</p>
+                                        <h4 class="font-bold text-sm mt-1 leading-snug ${item.sub && item.sub.action === 'cancel' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-100'}">${escapeHtml(item.title)}</h4>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1"><i class="fa-solid fa-user-tie mr-1"></i> ${item.teacher}</p>
+                                        ${item.sub && item.sub.note ? `<p class="text-[11px] text-violet-600 dark:text-violet-400 mt-1"><i class="fa-solid fa-note-sticky mr-1"></i>${escapeHtml(item.sub.note)}</p>` : ''}
                                     </div>
                                     <div class="flex flex-col items-end gap-1 shrink-0 ml-2">
                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded ${badgeColor}">${item.type}</span>
-                                        <span class="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-md mt-0.5">Ауд. ${item.room}</span>
+                                        <span class="bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 text-xs font-bold px-2 py-0.5 rounded-md mt-0.5">Ауд. ${escapeHtml(item.room)}</span>
+                                        <button onclick="toggleSkip('${thisDayISO}', ${item.num}, '${weekType}', ${dayNum})" title="Отметить пропуск" class="mt-1 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${skipBtnClass}"><i class="fa-solid fa-user-xmark text-[10px]"></i></button>
                                     </div>
                                 </div>
 
-                                <!-- Click-to-Edit Заметка -->
                                 <div id="note-container-${noteKey}" class="mt-2.5 transition-all">
-                                    <!-- Режим просмотра (нажми, чтобы редактировать) -->
-                                    <div id="note-view-${noteKey}" class="flex items-start gap-2 cursor-pointer transition-all ${savedNote ? 'bg-amber-50/60 border border-amber-200/50 p-2 rounded-lg hover:bg-amber-100/50' : 'p-1 opacity-50 hover:opacity-100'}" onclick="editLessonNote('${noteKey}')">
+                                    <div id="note-view-${noteKey}" class="flex items-start gap-2 cursor-pointer transition-all ${savedNote ? 'bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-900/60 p-2 rounded-lg hover:bg-amber-100/50 dark:hover:bg-amber-900/30' : 'p-1 opacity-50 hover:opacity-100'}" onclick="editLessonNote('${noteKey}')">
                                         <i class="fa-solid ${savedNote ? 'fa-thumbtack text-amber-500 mt-0.5' : 'fa-pen text-gray-400 mt-0.5'} text-[10px] shrink-0"></i>
-                                        <span id="note-text-${noteKey}" class="text-xs ${savedNote ? 'text-amber-900 font-medium' : 'text-gray-500'} flex-1 break-words">
+                                        <span id="note-text-${noteKey}" class="text-xs ${savedNote ? 'text-amber-900 dark:text-amber-200 font-medium' : 'text-gray-500 dark:text-gray-400'} flex-1 break-words">
                                             ${savedNote ? savedNote : 'Добавить заметку / ДЗ...'}
                                         </span>
                                     </div>
 
-                                    <!-- Режим редактирования (скрыт по умолчанию) -->
-                                    <div id="note-edit-${noteKey}" class="hidden bg-white rounded-lg border border-indigo-400 p-2 items-center gap-2 shadow-sm ring-2 ring-indigo-100">
+                                    <div id="note-edit-${noteKey}" class="hidden bg-white dark:bg-slate-900 rounded-lg border border-indigo-400 dark:border-indigo-700 p-2 items-center gap-2 shadow-sm ring-2 ring-indigo-100 dark:ring-indigo-950/60">
                                         <i class="fa-solid fa-pen text-indigo-400 text-[10px] shrink-0"></i>
-                                        <input type="text" id="note-input-${noteKey}" value="${savedNote}" placeholder="Записать ДЗ или дедлайн..." class="flex-1 bg-transparent text-xs text-gray-700 focus:outline-none placeholder-gray-400 w-full" onblur="saveLessonNote('${noteKey}')" onkeydown="if(event.key === 'Enter') this.blur()">
+                                        <input type="text" id="note-input-${noteKey}" value="${savedNote}" placeholder="Записать ДЗ или дедлайн..." class="flex-1 bg-transparent text-xs text-gray-700 dark:text-gray-200 focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 w-full" onblur="saveLessonNote('${noteKey}')" onkeydown="if(event.key === 'Enter') this.blur()">
                                     </div>
                                 </div>
                             </div>
@@ -921,11 +1629,11 @@
                                     <h3 class="font-bold text-sm tracking-wide">${dayNames[dayNum]}</h3>
                                     <span class="text-xs font-medium opacity-70">${dateStr}</span>
                                 </div>
-                                ${isRealToday ? '<span class="bg-slate-900 text-amber-300 font-extrabold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">Сегодня</span>' : ''}
+                                ${isRealToday ? '<span class="bg-slate-900 dark:bg-slate-950 text-amber-300 font-extrabold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">Сегодня</span>' : ''}
                             </div>
-                            <span class="text-[11px] opacity-80 font-medium shrink-0 ml-2">${getPairsLabel(dayLessons.length)}</span>
+                            <span class="text-[11px] opacity-80 font-medium shrink-0 ml-2">${getPairsLabel(renderList.length)}</span>
                         </div>
-                        <div class="divide-y divide-gray-100">${lessonsHtml}</div>
+                        <div class="divide-y divide-gray-100 dark:divide-slate-700/70">${lessonsHtml}</div>
                     </div>
                 `;
             }
@@ -937,12 +1645,12 @@
             bells.forEach(bell => {
                 bellsList.innerHTML += `
                     <li id="bell-row-${bell.num}" class="bell-row p-3.5 flex justify-between items-center transition-all">
-                        <span class="font-bold text-gray-800">${bell.num} пара</span>
+                        <span class="font-bold text-gray-800 dark:text-gray-100">${bell.num} пара</span>
                         <div class="flex items-center gap-2">
-                            <span class="badge-live hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 items-center gap-1 live-badge-ring">
+                            <span class="badge-live hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 items-center gap-1 live-badge-ring">
                                 <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping"></span> Идёт
                             </span>
-                            <span class="time-text font-mono text-indigo-600 font-semibold">${bell.start} – ${bell.end}</span>
+                            <span class="time-text font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${bell.start} – ${bell.end}</span>
                         </div>
                     </li>
                 `;
@@ -975,19 +1683,39 @@
                 });
             }
 
+            // Счётчик в шапке: до конца пары / до следующей пары
+            const cd = document.getElementById('pair-countdown');
+            if (cd) {
+                if (activePairNum) {
+                    const p = bells.find(b => b.num === activePairNum);
+                    const left = timeToMinutes(p.end) - currentMins;
+                    cd.innerText = `${activePairNum} пара · до конца ${left} мин`;
+                } else if (todayDay >= 1 && todayDay <= 5) {
+                    const next = bells.find(p => timeToMinutes(p.start) > currentMins);
+                    if (next) {
+                        const left = timeToMinutes(next.start) - currentMins;
+                        cd.innerText = `перерыв · до ${next.start} (${left} мин)`;
+                    } else {
+                        cd.innerText = 'пары на сегодня закончились';
+                    }
+                } else {
+                    cd.innerText = 'выходной';
+                }
+            }
+
             for (let i = 1; i <= 7; i++) {
                 const bellRow = document.getElementById(`bell-row-${i}`);
                 if (bellRow) {
                     const badge = bellRow.querySelector('.badge-live');
                     const timeText = bellRow.querySelector('.time-text');
                     if (i === activePairNum) {
-                        bellRow.className = "bell-row p-3.5 flex justify-between items-center bg-emerald-50/80 border-l-4 border-l-emerald-500 font-bold transition-all";
+                        bellRow.className = "bell-row p-3.5 flex justify-between items-center bg-emerald-50/80 dark:bg-emerald-950/40 border-l-4 border-l-emerald-500 font-bold transition-all";
                         if (badge) { badge.classList.remove('hidden'); badge.classList.add('flex'); }
-                        if (timeText) timeText.className = "time-text font-mono text-emerald-700 font-bold";
+                        if (timeText) timeText.className = "time-text font-mono text-emerald-700 dark:text-emerald-400 font-bold";
                     } else {
                         bellRow.className = "bell-row p-3.5 flex justify-between items-center transition-all";
                         if (badge) { badge.classList.add('hidden'); badge.classList.remove('flex'); }
-                        if (timeText) timeText.className = "time-text font-mono text-indigo-600 font-semibold";
+                        if (timeText) timeText.className = "time-text font-mono text-indigo-600 dark:text-indigo-400 font-semibold";
                     }
                 }
             }
@@ -998,10 +1726,10 @@
                 const cardPairNum = parseInt(card.id.split('-lesson-')[1]);
 
                 if (isCurrentDayCard && cardPairNum === activePairNum) {
-                    card.classList.add('bg-emerald-50/60');
+                    card.classList.add('bg-emerald-50/60', 'dark:bg-emerald-950/30');
                     if (badge) { badge.classList.remove('hidden'); badge.classList.add('flex'); }
                 } else {
-                    card.classList.remove('bg-emerald-50/60');
+                    card.classList.remove('bg-emerald-50/60', 'dark:bg-emerald-950/30');
                     if (badge) { badge.classList.add('hidden'); badge.classList.remove('flex'); }
                 }
             });
@@ -1012,9 +1740,9 @@
                 const btn = document.getElementById('nav-' + v);
                 if (v === active) {
                     btn.className = "flex flex-col items-center p-2 text-indigo-600 transition-colors w-20";
-                    btn.querySelector('div').className = "bg-indigo-100 p-2 rounded-xl mb-1";
+                    btn.querySelector('div').className = "bg-indigo-100 dark:bg-indigo-950/70 p-2 rounded-xl mb-1";
                 } else {
-                    btn.className = "flex flex-col items-center p-2 text-gray-400 hover:text-gray-800 transition-colors w-20";
+                    btn.className = "flex flex-col items-center p-2 text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors w-20";
                     btn.querySelector('div').className = "p-2 mb-1";
                 }
             });
@@ -1028,7 +1756,7 @@
                 view === 'study' ? 'Моя Учёба' : view === 'calendar' ? 'Мой Планер' : 'Настройки';
 
             const mainHeader = document.getElementById('main-header');
-            if (view === 'study' && (currentStudyTab === 'portal' || currentStudyTab === 'library')) {
+            if (view === 'study' && ['portal', 'library', 'consultant', 'garant'].includes(currentStudyTab)) {
                 mainHeader.style.display = 'none';
             } else {
                 mainHeader.style.display = 'block';
@@ -1044,18 +1772,16 @@
             const subTabsContainer = document.getElementById('sub-tabs-container');
             const mainHeader = document.getElementById('main-header');
 
-            if (tab === 'portal' || tab === 'library') {
+            if (['portal', 'library', 'consultant', 'garant'].includes(tab)) {
                 scrollableStudy.style.display = 'none';
                 subTabsContainer.style.display = 'none';
                 mainHeader.style.display = 'none';
 
-                // Логика встраивания + запасной вариант
                 const url = portalUrls[tab];
                 const ifr = document.getElementById('iframe-' + tab);
                 document.getElementById(tab + '-fallback-link').href = url;
 
                 if (appSettings.portalsExternal) {
-                    // Режим «только браузер»: iframe не грузим вообще
                     ifr.classList.add('hidden');
                     showFallback(tab);
                 } else {
@@ -1069,7 +1795,7 @@
                 mainHeader.style.display = 'block';
             }
 
-            ['schedule', 'bells', 'portal', 'library'].forEach(t => {
+            ['schedule', 'bells', 'homework', 'group', 'subs', 'grades', 'session', 'timer', 'portal', 'library', 'consultant', 'garant'].forEach(t => {
                 const el = document.getElementById('content-' + t);
                 const btn = document.getElementById('tab-' + t);
 
@@ -1077,8 +1803,8 @@
 
                 if (btn) {
                     btn.className = (t === tab) 
-                        ? "flex-1 py-2 px-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-600 transition-colors whitespace-nowrap"
-                        : "flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap";
+                        ? "flex-1 py-2 px-1 text-[11px] font-bold rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 transition-colors whitespace-nowrap"
+                        : "flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap";
                 }
             });
         }
