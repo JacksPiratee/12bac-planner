@@ -92,6 +92,7 @@
                         <button onclick="switchStudyTab('grades')" id="tab-grades" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-star mr-1"></i>Оценки</button>
                         <button onclick="switchStudyTab('session')" id="tab-session" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-fire mr-1"></i>Сессия</button>
                         <button onclick="switchStudyTab('timer')" id="tab-timer" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-stopwatch mr-1"></i>Таймер</button>
+                        <button onclick="switchStudyTab('journal')" id="tab-journal" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap"><i class="fa-solid fa-scroll mr-1"></i>Журнал</button>
                         <button onclick="switchStudyTab('portal')" id="tab-portal" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Фемида</button>
                         <button onclick="switchStudyTab('library')" id="tab-library" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Библиотека</button>
                         <button onclick="switchStudyTab('consultant')" id="tab-consultant" class="flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap">Консультант</button>
@@ -276,6 +277,18 @@
                         <div class="bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 rounded-2xl p-3 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed w-full">
                             <i class="fa-solid fa-lightbulb mr-1"></i> <b>Как пользоваться:</b> выбери задачу («повторить тему», «сделать ДЗ»), нажми «Старт» и ни на что не отвлекайся до сигнала. Всё личное — только на паузах.
                         </div>
+                    </div>
+
+                    <!-- Вкладка Журнал аудита -->
+                    <div id="content-journal" class="flex-col w-full md:max-w-xl self-center p-4 gap-3" style="display: none;">
+                        <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Журнал действий группы</h2>
+                        <div class="flex gap-2">
+                            <button onclick="setJournalFilter('all')" id="jf-all" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-indigo-600 text-white transition-all">Все события</button>
+                            <button onclick="setJournalFilter('del')" id="jf-del" class="flex-1 py-2 rounded-xl text-[11px] font-bold bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 transition-all">Только удаления</button>
+                            <button onclick="loadJournal()" class="px-3.5 rounded-xl text-[11px] font-bold bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 transition-all" title="Обновить"><i class="fa-solid fa-rotate"></i></button>
+                        </div>
+                        <ul id="journal-list" class="flex flex-col gap-2 pb-2"></ul>
+                        <p class="text-[10px] text-gray-400 leading-relaxed">В журнале: удаления, замены, объявления, пропуски и оценки — с подписью устройства. Хранится последние 300 событий.</p>
                     </div>
                 </div>
 
@@ -466,6 +479,38 @@
                     <p id="sync-status" class="text-[10px] text-gray-400">Синхронизация не настроена</p>
                 </div>
 
+                <!-- Вход через Google -->
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 transition-colors animate-in">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                            <i class="fa-brands fa-google text-sm" style="color:#EA4335"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Вход через Google</h2>
+                            <p class="text-[10px] text-gray-400">Одна личность на всех устройствах + честная подпись в журнале</p>
+                        </div>
+                    </div>
+                    <div id="auth-box"></div>
+                </div>
+
+                <!-- Подпись устройства -->
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 transition-colors animate-in">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-signature text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Подпись устройства</h2>
+                            <p class="text-[10px] text-gray-400">Как вас видит группа в журнале действий</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="device-name" placeholder="Например: Аня (староста)" maxlength="30" class="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100 min-w-0">
+                        <button onclick="saveDeviceName()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-4 text-xs transition-all shadow-sm shrink-0">Сохранить</button>
+                    </div>
+                    <p class="text-[10px] text-gray-400">ID устройства: <span id="device-id-label" class="font-mono"></span> — уникален для этого браузера, подделать его нельзя.</p>
+                </div>
+
                 <!-- Порталы -->
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col gap-3 transition-colors animate-in">
                     <div class="flex items-center gap-2.5">
@@ -613,6 +658,8 @@
         let skips = JSON.parse(localStorage.getItem('student_planner_skips')) || [];
         let grades = JSON.parse(localStorage.getItem('student_planner_grades')) || [];
         let tombstones = JSON.parse(localStorage.getItem('student_planner_tombstones')) || {};
+        let deviceProfile = JSON.parse(localStorage.getItem('student_planner_device')) || null;
+        let authSession = JSON.parse(localStorage.getItem('student_planner_auth')) || null;
 
         // Настройки синхронизации и приложения
         const syncConfig = JSON.parse(localStorage.getItem('student_planner_sync')) || { key: '', binId: '', auto: false, lastSync: 0, mode: 'jsonbin', supaCode: '' };
@@ -623,6 +670,7 @@
         const SUPA_URL = 'https://dvgqkjuigafehoztyizg.supabase.co/rest/v1';
         const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2Z3FranVpZ2FmZWhvenR5aXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTczNzAsImV4cCI6MjEwNjI3MzM3MH0.9bvulJIp-AxyUPY2a_SpShnHk6LqF7OY0qJ4MRRoLYM';
         const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+        const SUPA_AUTH_URL = 'https://dvgqkjuigafehoztyizg.supabase.co/auth/v1';
         const appSettings = JSON.parse(localStorage.getItem('student_planner_settings')) || { portalsExternal: false };
         function saveSyncConfig() { localStorage.setItem('student_planner_sync', JSON.stringify(syncConfig)); }
         function saveAppSettings() { localStorage.setItem('student_planner_settings', JSON.stringify(appSettings)); }
@@ -763,6 +811,7 @@
             setSyncStatus('Сохраняю в облако...');
             try {
                 await cloudPush();
+                flushAudit();
                 syncConfig.lastSync = Date.now();
                 saveSyncConfig();
                 setSyncStatus('Сохранено в облаке ✓ ' + new Date().toLocaleTimeString('ru-RU'));
@@ -818,6 +867,7 @@
 
         function scheduleAutoPush() {
             if (applyingRemote) return;
+            flushAudit();
             lastLocalChange = Date.now();
             if (!syncConfig.auto || !syncReady()) return;
             clearTimeout(syncTimer);
@@ -849,7 +899,9 @@
         }
 
         function deleteHomework(id) {
+            const h = homework.find(x => x.id === id);
             addTombstone('homework', id);
+            if (h) audit('delete_homework', { text: String(h.text).slice(0, 120), subject: h.subject });
             homework = homework.filter(h => h.id !== id);
             saveHomework(); renderHomework(); renderFullWeekSchedule();
         }
@@ -976,12 +1028,15 @@
             if (!text) return;
             announcements.unshift({ id: Date.now(), text, date: Date.now() });
             announcements = announcements.slice(0, 50);
+            audit('add_announcement', { text: text.slice(0, 120) });
             saveAnnouncements(); renderAnnouncements();
             input.value = '';
         }
 
         function deleteAnnouncement(id) {
+            const a = announcements.find(x => x.id === id);
             addTombstone('announcements', id);
+            if (a) audit('delete_announcement', { text: String(a.text).slice(0, 120) });
             announcements = announcements.filter(a => a.id !== id);
             saveAnnouncements(); renderAnnouncements();
         }
@@ -1033,13 +1088,16 @@
             if (action !== 'cancel' && !title) { alert('Выберите предмет'); return; }
             subs = subs.filter(s => !(s.date === date && s.num === num));
             subs.push({ id: Date.now(), date, num, action, title, room, note });
+            audit('add_sub', { num, date, title, subAction: action });
             saveSubs(); renderSubs(); renderFullWeekSchedule();
             document.getElementById('sub-room').value = '';
             document.getElementById('sub-note').value = '';
         }
 
         function deleteSub(id) {
+            const s = subs.find(x => x.id === id);
             addTombstone('subs', id);
+            if (s) audit('delete_sub', { num: s.num, date: s.date, title: s.title, subAction: s.action });
             subs = subs.filter(s => s.id !== id);
             saveSubs(); renderSubs(); renderFullWeekSchedule();
         }
@@ -1069,6 +1127,8 @@
             const key = dateISO + '_' + num;
             const idx = skips.findIndex(s => s.key === key);
             if (idx >= 0) {
+                const old = skips[idx];
+                audit('unmark_skip', { subject: old.subject, dateISO, num });
                 skips.splice(idx, 1);
             } else {
                 let subject = 'Доп. пара';
@@ -1080,12 +1140,15 @@
                     if (sub && sub.title) subject = sub.title;
                 }
                 skips.push({ id: Date.now(), key, subject, dateISO, num });
+                audit('mark_skip', { subject, dateISO, num });
             }
             saveSkips(); renderFullWeekSchedule(); renderGrades();
         }
 
         function deleteSkip(id) {
+            const s = skips.find(x => x.id === id);
             addTombstone('skips', id);
+            if (s) audit('delete_skip', { subject: s.subject, dateISO: s.dateISO, num: s.num });
             skips = skips.filter(s => s.id !== id);
             saveSkips(); renderFullWeekSchedule(); renderGrades();
         }
@@ -1122,11 +1185,14 @@
             const value = parseInt(document.getElementById('grade-value').value);
             if (!subject) { alert('Выберите предмет'); return; }
             grades.push({ id: Date.now(), subject, value, dateISO: formatDateISO(new Date()) });
+            audit('add_grade', { subject, value });
             saveGrades(); renderGrades();
         }
 
         function deleteGrade(id) {
+            const g = grades.find(x => x.id === id);
             addTombstone('grades', id);
+            if (g) audit('delete_grade', { subject: g.subject, value: g.value });
             grades = grades.filter(g => g.id !== id);
             saveGrades(); renderGrades();
         }
@@ -1356,6 +1422,7 @@
 
         function clearAllData() {
             if (!confirm('Удалить ВСЕ задачи, ДЗ, заметки и объявления на этом устройстве? (в облаке останутся)')) return;
+            audit('clear_all', {});
             tasks = []; homework = []; announcements = []; sessionExams = []; subs = []; skips = []; grades = []; lessonNotes = {}; tombstones = {};
             saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades(); saveTombstones();
             renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
@@ -1396,6 +1463,290 @@
                     showFallback(tab);
                 }
             }, 9000);
+        }
+
+        // ---------- Вход через Google (Supabase Auth) ----------
+
+        function loginGoogle() {
+            const redirect = window.location.href.split('#')[0];
+            window.location.href = SUPA_AUTH_URL + '/authorize?provider=google&redirect_to=' + encodeURIComponent(redirect);
+        }
+
+        async function handleAuthRedirect() {
+            if (!window.location.hash || window.location.hash.indexOf('access_token') < 0) return;
+            const params = new URLSearchParams(window.location.hash.slice(1));
+            authSession = {
+                access_token: params.get('access_token'),
+                refresh_token: params.get('refresh_token'),
+                expires_at: Date.now() + parseInt(params.get('expires_in') || '3600', 10) * 1000
+            };
+            localStorage.setItem('student_planner_auth', JSON.stringify(authSession));
+            window.location.hash = '';
+        }
+
+        async function loadAuthUser() {
+            if (!authSession) return;
+            const r = await fetch(SUPA_AUTH_URL + '/user', {
+                headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + authSession.access_token }
+            });
+            if (r.ok) {
+                authSession.user = await r.json();
+                localStorage.setItem('student_planner_auth', JSON.stringify(authSession));
+            } else if (r.status === 401) {
+                await refreshAuth();
+            }
+        }
+
+        async function refreshAuth() {
+            if (!authSession || !authSession.refresh_token) return;
+            if (Date.now() < authSession.expires_at - 60000) return;
+            const r = await fetch(SUPA_AUTH_URL + '/token?grant_type=refresh_token', {
+                method: 'POST',
+                headers: { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: authSession.refresh_token })
+            });
+            if (r.ok) {
+                const d = await r.json();
+                authSession.access_token = d.access_token;
+                authSession.refresh_token = d.refresh_token;
+                authSession.expires_at = Date.now() + d.expires_in * 1000;
+                localStorage.setItem('student_planner_auth', JSON.stringify(authSession));
+                await loadAuthUser();
+            } else {
+                authSession = null;
+                localStorage.removeItem('student_planner_auth');
+            }
+        }
+
+        function logoutGoogle() {
+            if (authSession && authSession.access_token) {
+                fetch(SUPA_AUTH_URL + '/logout', {
+                    method: 'POST',
+                    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + authSession.access_token }
+                }).catch(() => {});
+            }
+            authSession = null;
+            localStorage.removeItem('student_planner_auth');
+            renderAuthUI();
+        }
+
+        function currentActor() {
+            if (authSession && authSession.user) {
+                const u = authSession.user;
+                const meta = u.user_metadata || {};
+                return {
+                    name: meta.full_name || meta.name || (u.email ? u.email.split('@')[0] : 'Пользователь'),
+                    id: u.id,
+                    email: u.email || ''
+                };
+            }
+            return null;
+        }
+
+        function renderAuthUI() {
+            const box = document.getElementById('auth-box');
+            if (!box) return;
+            const a = currentActor();
+            if (a) {
+                const meta = (authSession.user && authSession.user.user_metadata) || {};
+                let av = meta.avatar_url || meta.picture || '';
+                if (av && av.indexOf('https://') !== 0) av = '';
+                box.innerHTML =
+                    '<div class="flex items-center gap-3">' +
+                        (av ? '<img src="' + escapeHtml(av) + '" referrerpolicy="no-referrer" class="w-10 h-10 rounded-full border border-gray-200 dark:border-slate-600">' : '<div class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-extrabold text-sm">' + escapeHtml((a.name || '?').charAt(0).toUpperCase()) + '</div>') +
+                        '<div class="min-w-0 flex-1">' +
+                            '<p class="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">' + escapeHtml(a.name) + '</p>' +
+                            '<p class="text-[10px] text-gray-400 truncate">' + escapeHtml(a.email) + '</p>' +
+                        '</div>' +
+                        '<button onclick="logoutGoogle()" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl px-3.5 py-2 text-[11px] transition-all shrink-0">Выйти</button>' +
+                    '</div>' +
+                    '<p class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-2 leading-relaxed"><i class="fa-solid fa-circle-check mr-1"></i>Журнал фиксирует ваш Google-аккаунт: на всех устройствах одна личность, подделать подпись нельзя.</p>';
+            } else {
+                box.innerHTML =
+                    '<button onclick="loginGoogle()" class="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-800 dark:text-gray-100 font-bold rounded-xl py-2.5 text-xs transition-all flex items-center justify-center gap-2">' +
+                        '<i class="fa-brands fa-google" style="color:#EA4335"></i> Войти через Google' +
+                    '</button>' +
+                    '<p class="text-[10px] text-gray-400 mt-2 leading-relaxed">После входа в журнале рядом с действиями будет ваш email. Если с одного устройства входили под разными аккаунтами — журнал сам это подсветит.</p>';
+            }
+        }
+
+        // ---------- Журнал аудита ----------
+
+        function getDeviceProfile() {
+            if (!deviceProfile) {
+                deviceProfile = {
+                    id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+                    name: '',
+                    info: {
+                        ua: (navigator.userAgent || '').slice(0, 200),
+                        platform: navigator.platform || '',
+                        lang: navigator.language || '',
+                        tz: (Intl.DateTimeFormat().resolvedOptions().timeZone) || '',
+                        screen: (window.screen ? window.screen.width + 'x' + window.screen.height : '')
+                    }
+                };
+                saveDeviceProfile();
+            }
+            return deviceProfile;
+        }
+
+        function saveDeviceProfile() { localStorage.setItem('student_planner_device', JSON.stringify(deviceProfile)); }
+
+        function saveDeviceName() {
+            const v = document.getElementById('device-name').value.trim().slice(0, 30);
+            getDeviceProfile().name = v;
+            saveDeviceProfile();
+            alert('Подпись сохранена ✓');
+        }
+
+        let auditQueue = [];
+        function audit(action, details) {
+            auditQueue.push({ action: action, details: details || {}, ts: Date.now() });
+            if (auditQueue.length > 10) flushAudit();
+        }
+
+        async function flushAudit() {
+            if (!auditQueue.length || syncConfig.mode !== 'supabase' || !syncConfig.supaCode) return;
+            const p = getDeviceProfile();
+            const actorObj = currentActor();
+            const rows = auditQueue.map(e => ({
+                group_code: syncConfig.supaCode,
+                actor: (actorObj && actorObj.name) || p.name || 'Без имени',
+                user_id: actorObj ? actorObj.id : null,
+                user_email: actorObj ? actorObj.email : null,
+                device_id: p.id,
+                device_info: p.info,
+                action: e.action,
+                details: e.details,
+                created_at: new Date(e.ts).toISOString()
+            }));
+            try {
+                const res = await fetch(SUPA_URL + '/audit_log', {
+                    method: 'POST',
+                    headers: Object.assign({}, SUPA_HEADERS, { 'Prefer': 'return=minimal' }),
+                    body: JSON.stringify(rows)
+                });
+                if (res.ok) {
+                    auditQueue = [];
+                    pruneAudit();
+                }
+            } catch (e) {}
+        }
+
+        async function pruneAudit() {
+            try {
+                const r = await fetch(SUPA_URL + '/audit_log?group_code=eq.' + encodeURIComponent(syncConfig.supaCode) + '&select=created_at&order=created_at.desc&limit=1&offset=299', { headers: SUPA_HEADERS });
+                if (!r.ok) return;
+                const rows = await r.json();
+                if (!rows.length) return;
+                await fetch(SUPA_URL + '/audit_log?group_code=eq.' + encodeURIComponent(syncConfig.supaCode) + '&created_at=lt.' + encodeURIComponent(rows[0].created_at), { method: 'DELETE', headers: SUPA_HEADERS });
+            } catch (e) {}
+        }
+
+        const AUDIT_LABELS = {
+            delete_task: 'удалил(а) задачу',
+            delete_homework: 'удалил(а) ДЗ',
+            delete_announcement: 'удалил(а) объявление',
+            delete_sub: 'удалил(а) замену',
+            delete_skip: 'удалил(а) отметку пропуска',
+            delete_grade: 'удалил(а) оценку',
+            clear_all: 'ПОЛНОСТЬЮ ОЧИСТИЛ(А) все данные',
+            add_sub: 'добавил(а) замену',
+            add_announcement: 'опубликовал(а) объявление',
+            add_grade: 'поставил(а) оценку',
+            mark_skip: 'отметил(а) пропуск',
+            unmark_skip: 'снял(а) отметку пропуска'
+        };
+        const AUDIT_DELETES = ['delete_task', 'delete_homework', 'delete_announcement', 'delete_sub', 'delete_skip', 'delete_grade', 'clear_all'];
+
+        function auditDetailsText(e) {
+            const d = e.details || {};
+            switch (e.action) {
+                case 'delete_task': return '«' + (d.text || '') + '»';
+                case 'delete_homework': return '«' + (d.text || '') + '» по ' + (d.subject || '—');
+                case 'delete_announcement':
+                case 'add_announcement': return '«' + (d.text || '') + '»';
+                case 'add_sub':
+                case 'delete_sub': return (d.num || '?') + ' пара, ' + (d.date || '—') + (d.title ? ' → ' + d.title : '');
+                case 'mark_skip':
+                case 'unmark_skip':
+                case 'delete_skip': return (d.subject || '—') + ', ' + (d.dateISO || '') + ', ' + (d.num || '?') + ' пара';
+                case 'add_grade':
+                case 'delete_grade': return (d.subject || '—') + ' — оценка ' + (d.value || '?');
+                default: return '';
+            }
+        }
+
+        let journalEntries = [];
+        let journalFilter = 'all';
+
+        function setJournalFilter(f) {
+            journalFilter = f;
+            document.getElementById('jf-all').className = f === 'all'
+                ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-indigo-600 text-white transition-all'
+                : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 transition-all';
+            document.getElementById('jf-del').className = f === 'del'
+                ? 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-indigo-600 text-white transition-all'
+                : 'flex-1 py-2 rounded-xl text-[11px] font-bold bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 transition-all';
+            renderJournal();
+        }
+
+        async function loadJournal() {
+            const list = document.getElementById('journal-list');
+            if (syncConfig.mode !== 'supabase' || !syncConfig.supaCode) {
+                list.innerHTML = '<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-6 italic">Журнал доступен в режиме Supabase.<br>Настройте синхронизацию («Ещё»).</p>';
+                return;
+            }
+            list.innerHTML = '<p class="text-xs text-gray-400 text-center py-6 italic">Загружаю...</p>';
+            try {
+                const r = await fetch(SUPA_URL + '/audit_log?group_code=eq.' + encodeURIComponent(syncConfig.supaCode) + '&select=*&order=created_at.desc&limit=100', { headers: SUPA_HEADERS });
+                if (!r.ok) throw new Error('supabase ' + r.status);
+                journalEntries = await r.json();
+                renderJournal();
+            } catch (e) {
+                list.innerHTML = '<p class="text-xs text-red-500 text-center py-6">Не удалось загрузить журнал: ' + escapeHtml(e.message) + '</p>';
+            }
+        }
+
+        function renderJournal() {
+            const list = document.getElementById('journal-list');
+            let items = journalEntries;
+            if (journalFilter === 'del') items = items.filter(e => AUDIT_DELETES.indexOf(e.action) >= 0);
+            if (!items.length) {
+                list.innerHTML = '<p class="text-xs text-gray-400 dark:text-gray-500 text-center py-6 italic">Записей нет</p>';
+                return;
+            }
+            // Индикатор: одно устройство -> разные аккаунты/подписи
+            const devSigns = {};
+            journalEntries.forEach(e => {
+                const k = e.device_id || '?';
+                if (!devSigns[k]) devSigns[k] = {};
+                devSigns[k][e.user_email || e.actor || '?'] = 1;
+            });
+            const mixedDevices = {};
+            Object.keys(devSigns).forEach(k => { if (Object.keys(devSigns[k]).length > 1) mixedDevices[k] = true; });
+
+            list.innerHTML = items.map(e => {
+                const isDel = AUDIT_DELETES.indexOf(e.action) >= 0;
+                const dt = new Date(e.created_at);
+                const time = dt.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const info = e.device_info || {};
+                const dev = [info.platform, info.screen].filter(Boolean).join(' · ') || (e.device_id || '').slice(0, 10);
+                const warn = mixedDevices[e.device_id || '?'];
+                return '<li class="bg-white dark:bg-slate-800 p-3 rounded-xl border ' + (isDel ? 'border-red-200 dark:border-red-950/60' : 'border-gray-100 dark:border-slate-700') + ' shadow-sm animate-in">' +
+                    '<div class="flex justify-between items-start gap-2">' +
+                        '<p class="text-xs font-bold ' + (isDel ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-100') + '">' + escapeHtml(AUDIT_LABELS[e.action] || e.action) + '</p>' +
+                        '<span class="text-[10px] text-gray-400 shrink-0">' + time + '</span>' +
+                    '</div>' +
+                    (auditDetailsText(e) ? '<p class="text-[11px] text-gray-600 dark:text-gray-300 mt-1 break-words">' + escapeHtml(auditDetailsText(e)) + '</p>' : '') +
+                    '<p class="text-[10px] text-gray-400 mt-1">' +
+                        '<i class="fa-solid fa-user mr-1"></i>' + escapeHtml(e.actor || 'Без имени') +
+                        (e.user_email ? ' <span class="text-gray-500 dark:text-gray-400">(' + escapeHtml(e.user_email) + ')</span>' : '') +
+                        ' <span class="opacity-60">· ' + escapeHtml(dev) + '</span>' +
+                        (warn ? ' <span class="text-amber-500 dark:text-amber-400 font-bold" title="С этого устройства заходили под разными аккаунтами"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>разные аккаунты</span>' : '') +
+                    '</p>' +
+                '</li>';
+            }).join('');
         }
 
         function getPairsLabel(count) {
@@ -1595,10 +1946,27 @@
             const task = tasks.find(t => t.id === id);
             if (task) { task.done = checkbox.checked; saveTasks(); renderTasks(); }
         }
-        function deleteTask(id) { addTombstone('tasks', id); tasks = tasks.filter(t => t.id !== id); saveTasks(); renderCalendar(); }
+        function deleteTask(id) {
+            const item = tasks.find(x => x.id === id);
+            addTombstone('tasks', id);
+            if (item) audit('delete_task', { text: String(item.text).slice(0, 120) });
+            tasks = tasks.filter(t => t.id !== id); saveTasks(); renderCalendar();
+        }
         function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 
         function initApp() {
+            handleAuthRedirect().then(() => refreshAuth()).then(() => loadAuthUser()).then(() => {
+                const a = currentActor();
+                if (a && !deviceProfile.name) { deviceProfile.name = a.name; saveDeviceProfile(); }
+                renderAuthUI();
+                const dn = document.getElementById('device-name');
+                if (dn && !dn.value) dn.value = getDeviceProfile().name || '';
+            }).catch(() => {});
+            getDeviceProfile();
+            if (!deviceProfile.name) {
+                const n = prompt('Как тебя видит группа? Имя для журнала действий (можно пропустить):');
+                if (n && n.trim()) { deviceProfile.name = n.trim().slice(0, 30); saveDeviceProfile(); }
+            }
             const today = new Date();
             document.getElementById('today-date-text').innerText = today.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -1629,6 +1997,8 @@
             document.getElementById('sync-mode').value = syncConfig.mode || 'jsonbin';
             document.getElementById('sync-group').value = syncConfig.supaCode || '';
             syncModeChanged();
+            document.getElementById('device-name').value = getDeviceProfile().name || '';
+            document.getElementById('device-id-label').innerText = getDeviceProfile().id;
             if (syncConfig.lastSync) setSyncStatus('Последняя синхронизация: ' + new Date(syncConfig.lastSync).toLocaleString('ru-RU'));
 
             const pe = document.getElementById('portals-external');
@@ -1654,6 +2024,7 @@
             // Фоновое авто-подтягивание из облака (не чаще раза в минуту,
             // и только если 15 секунд не было локальных правок — чтобы не конфликтовать)
             setInterval(() => {
+                refreshAuth();
                 if (!syncConfig.auto || !syncReady() || applyingRemote) return;
                 if (Date.now() - lastLocalChange < 15000) return;
                 cloudPull().then(rec => applyCloudRecord(rec)).catch(() => {});
@@ -1953,7 +2324,7 @@
                 mainHeader.style.display = 'block';
             }
 
-            ['schedule', 'bells', 'homework', 'group', 'subs', 'grades', 'session', 'timer', 'portal', 'library', 'consultant', 'garant'].forEach(t => {
+            ['schedule', 'bells', 'homework', 'group', 'subs', 'grades', 'session', 'timer', 'journal', 'portal', 'library', 'consultant', 'garant'].forEach(t => {
                 const el = document.getElementById('content-' + t);
                 const btn = document.getElementById('tab-' + t);
 
@@ -1965,6 +2336,8 @@
                         : "flex-1 py-2 px-1 text-[11px] font-bold rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors whitespace-nowrap";
                 }
             });
+
+            if (tab === 'journal') loadJournal();
         }
 
         window.onload = initApp;

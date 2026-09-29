@@ -1,6 +1,6 @@
 /* Service Worker: оффлайн-кэш приложения.
    Кэшируем только свои файлы — чужие ресурсы (CDN, iframe портала) не трогаем. */
-const CACHE = 'student-planner-v10';
+const CACHE = 'student-planner-v12';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (event) => {
