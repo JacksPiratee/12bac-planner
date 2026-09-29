@@ -435,18 +435,26 @@
                         </div>
                         <div>
                             <h2 class="text-sm font-bold text-gray-800 dark:text-gray-100">Синхронизация между устройствами</h2>
-                            <p class="text-[10px] text-gray-400">Задачи, ДЗ и объявления через бесплатный JSONBin.io</p>
+                            <p class="text-[10px] text-gray-400">Задачи, ДЗ и объявления — через Supabase (код группы) или JSONBin.io</p>
                         </div>
                     </div>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        1) Зарегистрируйтесь на <b>jsonbin.io</b> (бесплатно, 10 000 запросов/мес).<br>
-                        2) Скопируйте <b>X-Access-Key</b> из Dashboard и вставьте ниже.<br>
-                        3) Нажмите «Сохранить» — Bin ID создастся автоматически.<br>
-                        4) На другом устройстве введите тот же ключ и Bin ID.<br>
-                        Ключ хранится только в вашем браузере и никуда не отправляется, кроме jsonbin.io.
+                        Данные группы хранятся в облаке и синхронизируются между всеми устройствами.
+                        <b>Supabase</b> — нужен только общий код группы (рекомендуется).
+                        <b>JSONBin.io</b> — классический вариант с ключом. Введённые значения видны только в вашем браузере.
                     </p>
+                    <select id="sync-mode" onchange="syncModeChanged()" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 dark:text-gray-100 font-semibold">
+                        <option value="jsonbin">Режим: JSONBin.io (как раньше)</option>
+                        <option value="supabase">Режим: Supabase (рекомендуется)</option>
+                    </select>
+                    <div id="sync-supabase-box" class="hidden flex-col gap-2">
+                        <input type="text" id="sync-group" placeholder="Код группы (общий пароль группы)" autocomplete="off" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                        <p class="text-[10px] text-gray-400 leading-relaxed"><i class="fa-solid fa-circle-info mr-1"></i> Раздайте этот код одногруппникам — этого достаточно для синхронизации. Первая синхронизация создаст запись в облаке автоматически.</p>
+                    </div>
+                    <div id="sync-jsonbin-box" class="flex flex-col gap-2">
                     <input type="password" id="sync-key" placeholder="X-Access-Key (jsonbin.io)" autocomplete="off" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
                     <input type="text" id="sync-bin" placeholder="Bin ID (создастся автоматически)" autocomplete="off" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-500 dark:text-gray-100">
+                    </div>
                     <div class="flex gap-2">
                         <button onclick="syncSaveConfig()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl py-2.5 text-xs transition-all shadow-sm">Сохранить</button>
                         <button onclick="syncPush()" title="Загрузить в облако" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl py-2.5 px-3.5 text-xs transition-all"><i class="fa-solid fa-arrow-up mr-1"></i>В облако</button>
@@ -606,7 +614,14 @@
         let grades = JSON.parse(localStorage.getItem('student_planner_grades')) || [];
 
         // Настройки синхронизации и приложения
-        const syncConfig = JSON.parse(localStorage.getItem('student_planner_sync')) || { key: '', binId: '', auto: false, lastSync: 0 };
+        const syncConfig = JSON.parse(localStorage.getItem('student_planner_sync')) || { key: '', binId: '', auto: false, lastSync: 0, mode: 'jsonbin', supaCode: '' };
+        if (!syncConfig.mode) syncConfig.mode = 'jsonbin';
+        if (syncConfig.supaCode === undefined) syncConfig.supaCode = '';
+
+        // Supabase (PostgREST): таблица planner_data (group_code text unique, payload jsonb, updated_at)
+        const SUPA_URL = 'https://dvgqkjuigafehoztyizg.supabase.co/rest/v1';
+        const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2Z3FranVpZ2FmZWhvenR5aXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTczNzAsImV4cCI6MjEwNjI3MzM3MH0.9bvulJIp-AxyUPY2a_SpShnHk6LqF7OY0qJ4MRRoLYM';
+        const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
         const appSettings = JSON.parse(localStorage.getItem('student_planner_settings')) || { portalsExternal: false };
         function saveSyncConfig() { localStorage.setItem('student_planner_sync', JSON.stringify(syncConfig)); }
         function saveAppSettings() { localStorage.setItem('student_planner_settings', JSON.stringify(appSettings)); }
@@ -650,6 +665,36 @@
             el.className = isError ? "text-[10px] text-red-500 font-semibold" : "text-[10px] text-gray-400";
         }
 
+        function syncModeChanged() {
+            const m = document.getElementById('sync-mode').value;
+            const jb = document.getElementById('sync-jsonbin-box');
+            const sb = document.getElementById('sync-supabase-box');
+            jb.classList.toggle('hidden', m === 'supabase');
+            jb.classList.toggle('flex', m !== 'supabase');
+            sb.classList.toggle('hidden', m !== 'supabase');
+            sb.classList.toggle('flex', m === 'supabase');
+        }
+
+        function buildPayload() {
+            return { tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, updatedAt: Date.now() };
+        }
+
+        async function supaPush() {
+            const res = await fetch(SUPA_URL + '/planner_data?on_conflict=group_code', {
+                method: 'POST',
+                headers: Object.assign({}, SUPA_HEADERS, { 'Prefer': 'resolution=merge-duplicates' }),
+                body: JSON.stringify({ group_code: syncConfig.supaCode, payload: buildPayload(), updated_at: new Date().toISOString() })
+            });
+            if (!res.ok) throw new Error('supabase ответил ' + res.status);
+        }
+
+        async function supaPull() {
+            const res = await fetch(SUPA_URL + '/planner_data?group_code=eq.' + encodeURIComponent(syncConfig.supaCode) + '&select=payload', { headers: SUPA_HEADERS });
+            if (!res.ok) throw new Error('supabase ответил ' + res.status);
+            const rows = await res.json();
+            return (rows && rows[0] && rows[0].payload) || {};
+        }
+
         async function cloudCreateBin() {
             const res = await fetch('https://api.jsonbin.io/v3/b', {
                 method: 'POST',
@@ -662,6 +707,7 @@
         }
 
         async function cloudPush() {
+            if (syncConfig.mode === 'supabase') return supaPush();
             const res = await fetch('https://api.jsonbin.io/v3/b/' + syncConfig.binId, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Access-Key': syncConfig.key },
@@ -671,6 +717,7 @@
         }
 
         async function cloudPull() {
+            if (syncConfig.mode === 'supabase') return supaPull();
             const res = await fetch('https://api.jsonbin.io/v3/b/' + syncConfig.binId, {
                 headers: { 'X-Access-Key': syncConfig.key }
             });
@@ -682,7 +729,17 @@
             syncConfig.key = document.getElementById('sync-key').value.trim();
             syncConfig.binId = document.getElementById('sync-bin').value.trim();
             syncConfig.auto = document.getElementById('sync-auto').checked;
+            syncConfig.mode = document.getElementById('sync-mode').value;
+            syncConfig.supaCode = document.getElementById('sync-group').value.trim();
             saveSyncConfig();
+            if (syncConfig.mode === 'supabase') {
+                if (syncConfig.supaCode) {
+                    setSyncStatus('Supabase-режим сохранён ✓ Код группы: ' + syncConfig.supaCode);
+                } else {
+                    setSyncStatus('Введите код группы', true);
+                }
+                return;
+            }
             if (syncConfig.key && !syncConfig.binId) {
                 setSyncStatus('Создаю бин...');
                 try {
@@ -701,7 +758,7 @@
         }
 
         async function syncPush() {
-            if (!syncConfig.key || !syncConfig.binId) { setSyncStatus('Сначала введите ключ и нажмите «Сохранить»', true); return; }
+            if (!syncReady()) { setSyncStatus('Сначала настройте синхронизацию и нажмите «Сохранить»', true); return; }
             setSyncStatus('Сохраняю в облако...');
             try {
                 await cloudPush();
@@ -719,7 +776,7 @@
         }
 
         async function syncPull() {
-            if (!syncConfig.key || !syncConfig.binId) { setSyncStatus('Сначала введите ключ и нажмите «Сохранить»', true); return; }
+            if (!syncReady()) { setSyncStatus('Сначала настройте синхронизацию и нажмите «Сохранить»', true); return; }
             setSyncStatus('Загружаю из облака...');
             try {
                 const rec = await cloudPull();
@@ -739,9 +796,13 @@
             } catch (e) { setSyncStatus('Ошибка: ' + e.message, true); }
         }
 
+        function syncReady() {
+            return syncConfig.mode === 'supabase' ? !!syncConfig.supaCode : !!(syncConfig.key && syncConfig.binId);
+        }
+
         let syncTimer = null;
         function scheduleAutoPush() {
-            if (!syncConfig.auto || !syncConfig.key || !syncConfig.binId) return;
+            if (!syncConfig.auto || !syncReady()) return;
             clearTimeout(syncTimer);
             syncTimer = setTimeout(() => {
                 cloudPush().then(() => {
@@ -1482,6 +1543,9 @@
             document.getElementById('sync-key').value = syncConfig.key || '';
             document.getElementById('sync-bin').value = syncConfig.binId || '';
             document.getElementById('sync-auto').checked = !!syncConfig.auto;
+            document.getElementById('sync-mode').value = syncConfig.mode || 'jsonbin';
+            document.getElementById('sync-group').value = syncConfig.supaCode || '';
+            syncModeChanged();
             if (syncConfig.lastSync) setSyncStatus('Последняя синхронизация: ' + new Date(syncConfig.lastSync).toLocaleString('ru-RU'));
 
             const pe = document.getElementById('portals-external');
@@ -1504,7 +1568,7 @@
             setInterval(updateClockAndLiveStatus, 1000);
             updateClockAndLiveStatus();
 
-            if (syncConfig.auto && syncConfig.key && syncConfig.binId) {
+            if (syncConfig.auto && syncReady()) {
                 syncPull();
             }
         }
