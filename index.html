@@ -775,11 +775,9 @@
             return [...map.values()];
         }
 
-        async function syncPull() {
-            if (!syncReady()) { setSyncStatus('Сначала настройте синхронизацию и нажмите «Сохранить»', true); return; }
-            setSyncStatus('Загружаю из облака...');
+        function applyCloudRecord(rec) {
+            applyingRemote = true;
             try {
-                const rec = await cloudPull();
                 tasks = mergeById(tasks, Array.isArray(rec.tasks) ? rec.tasks : []);
                 homework = mergeById(homework, Array.isArray(rec.homework) ? rec.homework : []);
                 sessionExams = mergeById(sessionExams, Array.isArray(rec.sessionExams) ? rec.sessionExams : [])
@@ -792,7 +790,18 @@
                 lessonNotes = Object.assign({}, rec.lessonNotes || {}, lessonNotes);
                 saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades();
                 renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
-                setSyncStatus('Загружено из облака ✓');
+            } finally {
+                applyingRemote = false;
+            }
+        }
+
+        async function syncPull() {
+            if (!syncReady()) { setSyncStatus('Сначала настройте синхронизацию и нажмите «Сохранить»', true); return; }
+            setSyncStatus('Загружаю из облака...');
+            try {
+                const rec = await cloudPull();
+                applyCloudRecord(rec);
+                setSyncStatus('Загружено из облака ✓ ' + new Date().toLocaleTimeString('ru-RU'));
             } catch (e) { setSyncStatus('Ошибка: ' + e.message, true); }
         }
 
@@ -801,7 +810,12 @@
         }
 
         let syncTimer = null;
+        let lastLocalChange = 0;
+        let applyingRemote = false;
+
         function scheduleAutoPush() {
+            if (applyingRemote) return;
+            lastLocalChange = Date.now();
             if (!syncConfig.auto || !syncReady()) return;
             clearTimeout(syncTimer);
             syncTimer = setTimeout(() => {
@@ -1567,6 +1581,14 @@
 
             setInterval(updateClockAndLiveStatus, 1000);
             updateClockAndLiveStatus();
+
+            // Фоновое авто-подтягивание из облака (не чаще раза в минуту,
+            // и только если 15 секунд не было локальных правок — чтобы не конфликтовать)
+            setInterval(() => {
+                if (!syncConfig.auto || !syncReady() || applyingRemote) return;
+                if (Date.now() - lastLocalChange < 15000) return;
+                cloudPull().then(rec => applyCloudRecord(rec)).catch(() => {});
+            }, 60000);
 
             if (syncConfig.auto && syncReady()) {
                 syncPull();
