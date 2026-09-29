@@ -612,6 +612,7 @@
         let subs = JSON.parse(localStorage.getItem('student_planner_subs')) || [];
         let skips = JSON.parse(localStorage.getItem('student_planner_skips')) || [];
         let grades = JSON.parse(localStorage.getItem('student_planner_grades')) || [];
+        let tombstones = JSON.parse(localStorage.getItem('student_planner_tombstones')) || {};
 
         // Настройки синхронизации и приложения
         const syncConfig = JSON.parse(localStorage.getItem('student_planner_sync')) || { key: '', binId: '', auto: false, lastSync: 0, mode: 'jsonbin', supaCode: '' };
@@ -676,7 +677,7 @@
         }
 
         function buildPayload() {
-            return { tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, updatedAt: Date.now() };
+            return { tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, tombstones, updatedAt: Date.now() };
         }
 
         async function supaPush() {
@@ -778,6 +779,7 @@
         function applyCloudRecord(rec) {
             applyingRemote = true;
             try {
+                tombstones = mergeTombs(tombstones, rec.tombstones || {});
                 tasks = mergeById(tasks, Array.isArray(rec.tasks) ? rec.tasks : []);
                 homework = mergeById(homework, Array.isArray(rec.homework) ? rec.homework : []);
                 sessionExams = mergeById(sessionExams, Array.isArray(rec.sessionExams) ? rec.sessionExams : [])
@@ -788,7 +790,8 @@
                 announcements = mergeById(announcements, Array.isArray(rec.announcements) ? rec.announcements : [])
                     .sort((a, b) => b.date - a.date).slice(0, 50);
                 lessonNotes = Object.assign({}, rec.lessonNotes || {}, lessonNotes);
-                saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades();
+                applyTombs();
+                saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades(); saveTombstones();
                 renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
             } finally {
                 applyingRemote = false;
@@ -836,18 +839,19 @@
             const deadline = document.getElementById('hw-deadline').value;
             if (!text) return;
             homework.unshift({ id: Date.now(), subject, text, deadline, done: false });
-            saveHomework(); renderHomework();
+            saveHomework(); renderHomework(); renderFullWeekSchedule();
             document.getElementById('hw-text').value = '';
         }
 
         function toggleHomework(id, checkbox) {
             const h = homework.find(x => x.id === id);
-            if (h) { h.done = checkbox.checked; saveHomework(); renderHomework(); }
+            if (h) { h.done = checkbox.checked; saveHomework(); renderHomework(); renderFullWeekSchedule(); }
         }
 
         function deleteHomework(id) {
+            addTombstone('homework', id);
             homework = homework.filter(h => h.id !== id);
-            saveHomework(); renderHomework();
+            saveHomework(); renderHomework(); renderFullWeekSchedule();
         }
 
         function hwItemHtml(h) {
@@ -899,6 +903,23 @@
             list.innerHTML = html;
         }
 
+        // ДЗ предмета, сдаваемые в этот день или позже (для показа в расписании)
+        function hwHtmlForLesson(subject, dayISO, tmrISO) {
+            const items = homework
+                .filter(h => h.subject === subject && !h.done && h.deadline && h.deadline >= dayISO)
+                .sort((a, b) => a.deadline.localeCompare(b.deadline))
+                .slice(0, 3);
+            if (!items.length) return '';
+            return items.map(h => {
+                const isToday = h.deadline === dayISO;
+                const dtxt = isToday ? 'сдать сегодня' : parseLocalDate(h.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                const cls = isToday
+                    ? 'text-red-600 dark:text-red-400'
+                    : (h.deadline === tmrISO ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400');
+                return `<p class="text-[11px] mt-1.5 ${cls}"><i class="fa-solid fa-book mr-1"></i><span class="font-semibold">ДЗ:</span> ${escapeHtml(h.text)} <span class="opacity-70">· ${dtxt}</span></p>`;
+            }).join('');
+        }
+
         // ---------- Объявления группы ----------
 
         function saveAnnouncements() { localStorage.setItem('student_planner_announcements', JSON.stringify(announcements)); scheduleAutoPush(); }
@@ -906,6 +927,48 @@
         function saveSubs() { localStorage.setItem('student_planner_subs', JSON.stringify(subs)); scheduleAutoPush(); }
         function saveSkips() { localStorage.setItem('student_planner_skips', JSON.stringify(skips)); scheduleAutoPush(); }
         function saveGrades() { localStorage.setItem('student_planner_grades', JSON.stringify(grades)); scheduleAutoPush(); }
+
+        // Tombstones: факты удаления, чтобы удаления тоже синхронизировались
+        function saveTombstones() {
+            Object.keys(tombstones).forEach(c => {
+                const entries = Object.entries(tombstones[c] || {});
+                if (entries.length > 300) {
+                    entries.sort((a, b) => a[1] - b[1]);
+                    tombstones[c] = Object.fromEntries(entries.slice(entries.length - 300));
+                }
+            });
+            localStorage.setItem('student_planner_tombstones', JSON.stringify(tombstones));
+            scheduleAutoPush();
+        }
+
+        function addTombstone(coll, id) {
+            if (!tombstones[coll]) tombstones[coll] = {};
+            tombstones[coll][id] = Date.now();
+            saveTombstones();
+        }
+
+        function mergeTombs(local, remote) {
+            const out = {};
+            const colls = new Set([...Object.keys(local || {}), ...Object.keys(remote || {})]);
+            colls.forEach(c => { out[c] = Object.assign({}, (local || {})[c], (remote || {})[c]); });
+            return out;
+        }
+
+        function filterTombed(arr, coll) {
+            const t = tombstones[coll];
+            if (!t) return arr;
+            return arr.filter(x => !t[x.id]);
+        }
+
+        function applyTombs() {
+            tasks = filterTombed(tasks, 'tasks');
+            homework = filterTombed(homework, 'homework');
+            sessionExams = filterTombed(sessionExams, 'sessionExams');
+            subs = filterTombed(subs, 'subs');
+            skips = filterTombed(skips, 'skips');
+            grades = filterTombed(grades, 'grades');
+            announcements = filterTombed(announcements, 'announcements');
+        }
 
         function addAnnouncement() {
             const input = document.getElementById('announce-text');
@@ -918,6 +981,7 @@
         }
 
         function deleteAnnouncement(id) {
+            addTombstone('announcements', id);
             announcements = announcements.filter(a => a.id !== id);
             saveAnnouncements(); renderAnnouncements();
         }
@@ -975,6 +1039,7 @@
         }
 
         function deleteSub(id) {
+            addTombstone('subs', id);
             subs = subs.filter(s => s.id !== id);
             saveSubs(); renderSubs(); renderFullWeekSchedule();
         }
@@ -1020,6 +1085,7 @@
         }
 
         function deleteSkip(id) {
+            addTombstone('skips', id);
             skips = skips.filter(s => s.id !== id);
             saveSkips(); renderFullWeekSchedule(); renderGrades();
         }
@@ -1060,6 +1126,7 @@
         }
 
         function deleteGrade(id) {
+            addTombstone('grades', id);
             grades = grades.filter(g => g.id !== id);
             saveGrades(); renderGrades();
         }
@@ -1253,7 +1320,7 @@
         // ---------- Резервная копия ----------
 
         function exportData() {
-            const blob = new Blob([JSON.stringify({ tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades }, null, 2)], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify({ tasks, lessonNotes, homework, announcements, sessionExams, subs, skips, grades, tombstones }, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = 'planner-backup-' + formatDateISO(new Date()) + '.json';
@@ -1277,8 +1344,10 @@
                     if (Array.isArray(d.skips)) skips = d.skips;
                     if (Array.isArray(d.grades)) grades = d.grades;
                     if (d.lessonNotes && typeof d.lessonNotes === 'object') lessonNotes = d.lessonNotes;
-                    saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSubs(); saveSkips(); saveGrades();
-                    renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSubs(); renderGrades();
+                    if (d.tombstones) tombstones = d.tombstones;
+                    applyTombs();
+                    saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades(); saveTombstones();
+                    renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
                     alert('Импортировано ✓');
                 } catch (e) { alert('Не удалось прочитать файл: ' + e.message); }
             };
@@ -1287,8 +1356,8 @@
 
         function clearAllData() {
             if (!confirm('Удалить ВСЕ задачи, ДЗ, заметки и объявления на этом устройстве? (в облаке останутся)')) return;
-            tasks = []; homework = []; announcements = []; sessionExams = []; subs = []; skips = []; grades = []; lessonNotes = {};
-            saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades();
+            tasks = []; homework = []; announcements = []; sessionExams = []; subs = []; skips = []; grades = []; lessonNotes = {}; tombstones = {};
+            saveTasks(); saveNotes(); saveHomework(); saveAnnouncements(); saveSession(); saveSubs(); saveSkips(); saveGrades(); saveTombstones();
             renderCalendar(); renderFullWeekSchedule(); renderHomework(); renderAnnouncements(); renderSession(); renderSubs(); renderGrades();
         }
 
@@ -1526,7 +1595,7 @@
             const task = tasks.find(t => t.id === id);
             if (task) { task.done = checkbox.checked; saveTasks(); renderTasks(); }
         }
-        function deleteTask(id) { tasks = tasks.filter(t => t.id !== id); saveTasks(); renderCalendar(); }
+        function deleteTask(id) { addTombstone('tasks', id); tasks = tasks.filter(t => t.id !== id); saveTasks(); renderCalendar(); }
         function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 
         function initApp() {
@@ -1625,6 +1694,8 @@
                 thisDayDate.setDate(monday.getDate() + (dayNum - 1));
                 const dateStr = thisDayDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
                 const thisDayISO = formatDateISO(thisDayDate);
+                const tmrD = new Date(thisDayDate); tmrD.setDate(tmrD.getDate() + 1);
+                const tmrISO = formatDateISO(tmrD);
 
                 const isRealToday = (thisDayISO === realTodayStr);
 
@@ -1702,6 +1773,7 @@
                                         <input type="text" id="note-input-${noteKey}" value="${savedNote}" placeholder="Записать ДЗ или дедлайн..." class="flex-1 bg-transparent text-xs text-gray-700 dark:text-gray-200 focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 w-full" onblur="saveLessonNote('${noteKey}')" onkeydown="if(event.key === 'Enter') this.blur()">
                                     </div>
                                 </div>
+                                ${hwHtmlForLesson(item.title, thisDayISO, tmrISO)}
                             </div>
                         `;
                     });
