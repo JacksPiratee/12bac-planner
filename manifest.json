@@ -1,0 +1,16 @@
+{
+  "name": "Планер Студента — 12 Группа",
+  "short_name": "Планер 12",
+  "description": "Расписание пар, задачи и заметки студента",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#cbd5e1",
+  "theme_color": "#4f46e5",
+  "lang": "ru",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
